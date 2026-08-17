@@ -1,0 +1,106 @@
+# Requires the NVIDIA Container Toolkit on the host for the `gpu` device
+# reservations below to work (https://github.com/NVIDIA/nvidia-container-toolkit).
+# Only `gateway` publishes a port; the two AI services are reachable only
+# from other containers on the `internal` network.
+
+services:
+  gateway:
+    build: .
+    image: urdu-app-gateway:local
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      TRANSCRIPTION_SERVICE_URL: http://transcription:8001
+      TRANSLATION_SERVICE_URL: http://translation:8002
+    depends_on:
+      - transcription
+      - translation
+    networks:
+      - internal
+    restart: unless-stopped
+    read_only: false # multer/TTS cache write to ./uploads and ./audio-cache
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', r => process.exit(r.statusCode===200?0:1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+
+  transcription:
+    build: ./ai-services/transcription
+    image: urdu-transcription-service:local
+    env_file:
+      - .env
+    environment:
+      # Both services share one .env file, so a key defined in it (like
+      # MODEL_CACHE_DIR) can only have one value across both containers -
+      # these overrides are what actually make the two services' ports and
+      # cache paths differ, regardless of what .env itself contains.
+      SERVICE_PORT: "8001"
+      MODEL_CACHE_DIR: /models/whisper
+    volumes:
+      - whisper-model-cache:/models/whisper
+    networks:
+      - internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  translation:
+    build: ./ai-services/translation
+    image: urdu-translation-service:local
+    env_file:
+      - .env
+    environment:
+      # See the same note on the transcription service above.
+      SERVICE_PORT: "8002"
+      MODEL_CACHE_DIR: /models/translation
+    volumes:
+      - translation-model-cache:/models/translation
+    networks:
+      - internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 300s
+    deploy:
+      resources:
+        limits:
+          memory: 24G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+networks:
+  internal:
+    driver: bridge
+    internal: false # set to `true` once the gateway no longer needs external egress (e.g. OpenAI TTS) - see docs/AI_FEATURE.md
+
+volumes:
+  whisper-model-cache:
+  translation-model-cache:

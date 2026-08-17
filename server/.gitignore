@@ -1,0 +1,19 @@
+node_modules/
+.env
+uploads/*
+!uploads/.gitkeep
+audio-cache/
+*.log
+
+# Local Claude Code tool-permission cache, not project config
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Model caches (mounted volumes in production, never committed)
+ai-services/*/models/

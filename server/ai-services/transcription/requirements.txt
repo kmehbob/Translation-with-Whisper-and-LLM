@@ -1,0 +1,6 @@
+# Pinned exact versions. faster-whisper (CTranslate2 backend) does NOT need
+# torch, which keeps the image small and startup fast.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+faster-whisper==1.1.0

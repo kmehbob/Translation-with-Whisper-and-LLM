@@ -1,0 +1,9 @@
+# Minimal deps for running the unit tests in tests/test_app.py, which stub
+# model_backend before startup so faster-whisper/ctranslate2 never need to be
+# installed. Install requirements.txt as well before running integration
+# tests that exercise the real model.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pytest==8.3.4
+httpx==0.28.1

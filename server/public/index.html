@@ -1,0 +1,86 @@
+
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>اردو آڈیو ٹرانسکرپشن اور ترجمہ</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Step 1: Permission Request -->
+    <div id="step1" class="container">
+        <h1>مائیکروفون کی اجازت</h1>
+        <p>اس ایپ کو آپ کی آواز ریکارڈ کرنے کے لیے مائیکروفون کی اجازت درکار ہے۔</p>
+        <button id="permissionBtn" type="button">مائیکروفون کی اجازت دیں</button>
+        <div id="errorMsg" class="message error hidden" role="alert"></div>
+        <div id="instructions" class="hidden">
+            <h3>اگر آپ کو اجازت ڈائیلاگ نہیں دکھایا گیا:</h3>
+            <ol>
+                <li>براؤزر کے ایڈریس بار میں آئیکن پر کلک کریں</li>
+                <li>مائیکروفون کی اجازت کو "اجازت دیں" پر سیٹ کریں</li>
+                <li>صفحہ کو ریفریش کریں اور دوبارہ کوشش کریں</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Step 2: Recording, editing and translation interface -->
+    <div id="step2" class="container hidden">
+        <h1>اردو آڈیو ریکارڈنگ اور انگریزی ترجمہ</h1>
+        <div id="successMsg" class="message success">مائیکروفون کی اجازت مل گئی!</div>
+
+        <div class="status-text">
+            <span id="recordingStatus">ریکارڈنگ تیار ہے</span>
+            <span id="recordingTime" class="recording-time hidden">00:00</span>
+        </div>
+
+        <div class="button-container">
+            <button id="startBtn" type="button">
+                <span class="recording-indicator"></span>
+               🔴 ریکارڈنگ شروع کریں
+            </button>
+            <button id="stopBtn" type="button" disabled>
+                <span class="recording-indicator"></span>
+                ⏹ ریکارڈنگ روکیں
+            </button>
+            <button id="clearBtn" type="button">🗑️ صاف کریں</button>
+        </div>
+
+        <div class="upload-row">
+            <label for="audioFileInput">یا پہلے سے ریکارڈ شدہ آڈیو فائل اپ لوڈ کریں:</label>
+            <input type="file" id="audioFileInput" accept="audio/webm,audio/mp3,audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/aac">
+        </div>
+
+        <div class="outputs-grid">
+            <div class="output-container">
+                <h3 id="urduLabel">اردو متن (قابلِ ترمیم)</h3>
+                <label for="urduText" class="sr-only">اردو متن، آپ اسے یہاں ٹائپ یا ترمیم کر سکتے ہیں</label>
+                <textarea id="urduText" aria-labelledby="urduLabel" placeholder="یہاں اردو متن ٹائپ کریں یا ریکارڈنگ کا انتظار کریں..."></textarea>
+                <div class="output-actions">
+                    <button id="copyUrduBtn" type="button">📋 اردو کاپی کریں</button>
+                    <button id="translateBtn" type="button" disabled>🌐 انگریزی میں ترجمہ کریں</button>
+                </div>
+            </div>
+
+            <div class="output-container">
+                <h3 id="englishLabel">
+                    English Translation
+                    <span id="staleNotice" class="stale-badge hidden">⚠ Outdated — translate again</span>
+                </h3>
+                <label for="englishText" class="sr-only">English translation output, read only</label>
+                <textarea id="englishText" readonly aria-labelledby="englishLabel" placeholder="Translation will appear here"></textarea>
+                <div class="output-actions">
+                    <button id="copyEnglishBtn" type="button" disabled>📋 Copy English</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="translateStatus" class="status-text" role="status" aria-live="polite"></div>
+        <div id="translateError" class="message error hidden" role="alert"></div>
+
+        <div id="debug" class="hidden"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
