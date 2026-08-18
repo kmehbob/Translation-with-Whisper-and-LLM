@@ -71,6 +71,19 @@
             <div class="live-col-input">
               <div class="live-col-scroll">
 
+                <div class="input-mode-tabs" role="tablist" aria-label="Input method">
+                    <button type="button" class="active" id="inputModeRecordBtn" role="tab" aria-selected="true" aria-controls="recordModePanel">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
+                        <span data-i18n="inputModeRecord">Record</span>
+                    </button>
+                    <button type="button" id="inputModeUploadBtn" role="tab" aria-selected="false" aria-controls="uploadModePanel">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.5 4.5 0 0 1-1-8.9A5.5 5.5 0 0 1 16.9 7.1 4 4 0 0 1 17 15h-1"/><polyline points="12 12 12 21"/><polyline points="9 15 12 12 15 15"/></svg>
+                        <span data-i18n="inputModeUpload">Upload</span>
+                    </button>
+                </div>
+
+                <div id="recordModePanel">
+
                 <!-- Mic permission gate -->
                 <div id="step1" class="card">
                     <div class="card-icon-row">
@@ -109,14 +122,20 @@
                             </button>
                             <b class="mic-circle-label" id="startBtnLabel" data-i18n="startRecordingLabel">Start recording</b>
                         </div>
-                        <canvas id="visualizer" width="480" height="56" aria-hidden="true"></canvas>
+                        <div class="visualizer-wrap">
+                            <canvas id="visualizer" width="480" height="56" aria-hidden="true"></canvas>
+                            <span class="visualizer-hint" id="visualizerHint" data-i18n="visualizerIdleHint">Audio levels will appear here</span>
+                        </div>
                     </div>
 
-                    <p class="record-time-row"><span id="recordingTime">00:00</span> / <span id="maxDurationLabel">10:00</span></p>
+                    <div class="record-time-row">
+                        <span><span id="recordingTime">00:00</span> / <span id="maxDurationLabel">10:00</span></span>
+                        <progress id="recordProgress" class="record-progress" value="0" max="600" aria-hidden="true"></progress>
+                    </div>
 
                     <div class="button-row">
                         <button id="pauseBtn" type="button" class="btn btn-secondary btn-sm" disabled>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                            <svg id="pauseBtnIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
                             <span id="pauseBtnLabel" data-i18n="pauseBtn">Pause</span>
                         </button>
                         <button id="stopBtn" type="button" class="btn btn-secondary btn-sm" disabled>
@@ -130,7 +149,10 @@
                     </div>
                 </section>
 
+                </div>
+
                 <!-- Upload -->
+                <div id="uploadModePanel" class="hidden">
                 <section id="uploadSection" class="card" aria-labelledby="uploadHeading">
                     <h2 id="uploadHeading" data-i18n="uploadCardTitle">Upload audio file</h2>
                     <div id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="Drag an audio file here, or press Enter to choose one">
@@ -142,22 +164,9 @@
                     </div>
                     <div id="uploadFileList" class="upload-file-list" aria-live="polite"></div>
                 </section>
+                </div>
 
               </div>
-
-                <div class="language-row">
-                    <div class="language-field">
-                        <label for="sourceLanguage" data-i18n="sourceLabel">Source language</label>
-                        <select id="sourceLanguage"></select>
-                    </div>
-                    <button type="button" class="icon-btn swap-btn" id="swapLangBtn" aria-label="Swap source and target languages">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-                    </button>
-                    <div class="language-field">
-                        <label for="targetLanguage" data-i18n="targetLabel">Target language</label>
-                        <select id="targetLanguage"></select>
-                    </div>
-                </div>
 
                 <button id="transcribeManualBtn" type="button" class="btn btn-primary btn-block" disabled>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="10" x2="4" y2="14"/><line x1="8" y1="6" x2="8" y2="18"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="16" y1="6" x2="16" y2="18"/><line x1="20" y1="10" x2="20" y2="14"/></svg>
@@ -211,6 +220,20 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <div class="language-row">
+            <div class="language-field">
+                <label for="sourceLanguage" data-i18n="sourceLabel">Source language</label>
+                <select id="sourceLanguage"></select>
+            </div>
+            <button type="button" class="icon-btn swap-btn" id="swapLangBtn" aria-label="Swap source and target languages">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            </button>
+            <div class="language-field">
+                <label for="targetLanguage" data-i18n="targetLabel">Target language</label>
+                <select id="targetLanguage"></select>
             </div>
         </div>
 
@@ -349,10 +372,22 @@
 
         <div id="historyStatus2" class="status-text" role="status" aria-live="polite"></div>
 
+        <div id="historyBulkBar" class="history-bulk-bar hidden">
+            <span id="historyBulkCount">0 selected</span>
+            <div class="history-bulk-actions">
+                <button type="button" class="btn btn-ghost btn-sm" id="historyBulkClearBtn" data-i18n="bulkClearSelection">Clear selection</button>
+                <button type="button" class="btn btn-danger btn-sm" id="historyBulkDeleteBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                    <span data-i18n="bulkDeleteSelected">Delete selected</span>
+                </button>
+            </div>
+        </div>
+
         <div class="scroller history-table-wrap">
             <table id="historyTable" class="history-table hidden">
                 <thead>
                     <tr>
+                        <th class="col-select"><input type="checkbox" id="historySelectAllCheckbox" aria-label="Select all"></th>
                         <th data-i18n="colRecording">Recording</th>
                         <th data-i18n="colSource">Source</th>
                         <th data-i18n="colDuration">Duration</th>

@@ -159,3 +159,59 @@ describe("POST /api/v1/transcribe", () => {
         expect(await waitForEmptyUploadsDir()).toBe(true);
     });
 });
+
+describe("POST /api/v1/transcribe with an existing recordingId", () => {
+    const recordingsRepo = require("../lib/recordingsRepo");
+    const os = require("os");
+    const tempAudioDir = fs.mkdtempSync(path.join(os.tmpdir(), "transcribe-recordingid-test-"));
+
+    function seedPendingRecording(storedFilename, { withAudioFile = true } = {}) {
+        if (withAudioFile) {
+            fs.writeFileSync(path.join(tempAudioDir, storedFilename), Buffer.from("fake-mp3-bytes"));
+        }
+        return recordingsRepo.create({
+            sourceType: "recorded",
+            originalFilename: "recording-2026-01-01_00-00-00.webm",
+            storedFilename,
+            mimeType: "audio/mpeg",
+            fileSizeBytes: 14,
+            sourceLanguage: "ur",
+        });
+    }
+
+    test("transcribes the already-stored audio in place instead of creating a new recording", async () => {
+        const storedFilename = "existing-recording.mp3";
+        const existing = seedPendingRecording(storedFilename);
+        audioStorage.storedFilePath.mockImplementation((name) => path.join(tempAudioDir, name));
+        mockRequest.mockResolvedValue({ status: 200, data: { text: "منتقل شدہ متن", language: "ur" } });
+
+        const res = await request(app)
+            .post("/api/v1/transcribe")
+            .field("recordingId", existing.id);
+
+        expect(res.status).toBe(200);
+        expect(res.body.recordingId).toBe(existing.id);
+        expect(res.body.text).toBe("منتقل شدہ متن");
+        expect(audioStorage.convertToMp3).not.toHaveBeenCalled();
+
+        const updated = recordingsRepo.getById(existing.id);
+        expect(updated.status).toBe("transcribed");
+        expect(updated.transcription_text).toBe("منتقل شدہ متن");
+    });
+
+    test("404s when the recordingId doesn't exist", async () => {
+        const res = await request(app).post("/api/v1/transcribe").field("recordingId", "does-not-exist");
+        expect(res.status).toBe(404);
+        expect(mockRequest).not.toHaveBeenCalled();
+    });
+
+    test("409s when the recording's audio file is missing from disk", async () => {
+        const storedFilename = "gone-by-now.mp3";
+        const existing = seedPendingRecording(storedFilename, { withAudioFile: false });
+        audioStorage.storedFilePath.mockImplementation((name) => path.join(tempAudioDir, name));
+
+        const res = await request(app).post("/api/v1/transcribe").field("recordingId", existing.id);
+        expect(res.status).toBe(409);
+        expect(mockRequest).not.toHaveBeenCalled();
+    });
+});

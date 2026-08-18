@@ -121,33 +121,50 @@ router.post(
         const uploadedPath = req.file?.path;
         const sourceType = req.body.source === "uploaded" ? "uploaded" : "recorded";
         const sourceLanguage = (req.body.language || config.defaultSourceLanguage || "auto").trim();
+        const existingRecordingId = req.body.recordingId ? String(req.body.recordingId) : null;
 
         let recording = null;
 
         try {
-            if (!req.file) {
-                return res.status(400).json({ error: "No audio file was provided", requestId: req.id });
+            if (existingRecordingId) {
+                // The audio was already saved to history (POST /api/v1/recordings,
+                // e.g. as soon as a recording/upload completed, before the user
+                // ever pressed "Transcribe audio") - reuse that stored MP3
+                // in place instead of uploading and converting it a second time.
+                recording = recordingsRepo.getById(existingRecordingId);
+                if (!recording) {
+                    return res.status(404).json({ error: "Recording not found", requestId: req.id });
+                }
+                if (!fs.existsSync(audioStorage.storedFilePath(recording.stored_filename))) {
+                    return res.status(409).json({ error: "This recording's audio is no longer available", requestId: req.id });
+                }
+                recordingsRepo.update(recording.id, { status: "transcribing" });
+            } else {
+                if (!req.file) {
+                    return res.status(400).json({ error: "No audio file was provided", requestId: req.id });
+                }
+
+                // Every recording is normalized to MP3 for permanent storage,
+                // regardless of the format it arrived in (webm from the
+                // browser recorder, or any of the uploadable formats above).
+                const converted = await audioStorage.convertToMp3(uploadedPath);
+                const durationSeconds = await audioStorage.probeDurationSeconds(converted.storedPath);
+
+                recording = recordingsRepo.create({
+                    sourceType,
+                    originalFilename: req.file.originalname || null,
+                    storedFilename: converted.storedFilename,
+                    mimeType: "audio/mpeg",
+                    fileSizeBytes: converted.fileSizeBytes,
+                    sourceLanguage,
+                });
+                recordingsRepo.update(recording.id, { status: "transcribing", duration_seconds: durationSeconds });
             }
 
-            // Every recording is normalized to MP3 for permanent storage,
-            // regardless of the format it arrived in (webm from the
-            // browser recorder, or any of the uploadable formats above).
-            const converted = await audioStorage.convertToMp3(uploadedPath);
-            const durationSeconds = await audioStorage.probeDurationSeconds(converted.storedPath);
-
-            recording = recordingsRepo.create({
-                sourceType,
-                originalFilename: req.file.originalname || null,
-                storedFilename: converted.storedFilename,
-                mimeType: "audio/mpeg",
-                fileSizeBytes: converted.fileSizeBytes,
-                sourceLanguage,
-            });
-            recordingsRepo.update(recording.id, { status: "transcribing", duration_seconds: durationSeconds });
-
+            const storedPath = audioStorage.storedFilePath(recording.stored_filename);
             const formData = new FormData();
-            formData.append("file", fs.createReadStream(converted.storedPath), {
-                filename: converted.storedFilename,
+            formData.append("file", fs.createReadStream(storedPath), {
+                filename: recording.stored_filename,
                 contentType: "audio/mpeg",
             });
             if (sourceLanguage && sourceLanguage !== "auto") {
@@ -175,7 +192,7 @@ router.post(
                 requestId: req.id,
                 recordingId: recording.id,
                 durationMs: Date.now() - startedAt,
-                audioBytes: converted.fileSizeBytes,
+                audioBytes: recording.file_size_bytes,
             });
 
             res.json({

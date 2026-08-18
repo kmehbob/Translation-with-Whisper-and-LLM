@@ -21,8 +21,12 @@ const UI_STRINGS = {
         instructionsStep1: "Click the icon in your browser's address bar",
         instructionsStep2: "Set microphone permission to \"Allow\"",
         instructionsStep3: "Refresh the page and try again",
+        inputModeRecord: "Record",
+        inputModeUpload: "Upload",
         recordCardTitle: "Record audio",
         startRecordingLabel: "Start recording",
+        visualizerIdleHint: "Audio levels will appear here",
+        maxRecordingLengthReached: "Maximum recording length reached — recording stopped automatically.",
         statusReady: "Ready",
         statusRecording: "Recording",
         statusPaused: "Paused",
@@ -122,6 +126,13 @@ const UI_STRINGS = {
         noAudioAvailable: "(no filename)",
         untitled: "(untitled)",
         exportHistoryEmpty: "No recordings to export.",
+        bulkSelectedCount: "{n} selected",
+        bulkClearSelection: "Clear selection",
+        bulkDeleteSelected: "Delete selected",
+        bulkDeleteConfirm: "Delete {n} selected recording(s)? This cannot be undone.",
+        bulkDeleteSuccess: "{n} recording(s) deleted.",
+        bulkDeletePartial: "{succeeded} deleted, {failed} failed.",
+        downloadAudioAria: "Download audio",
     },
     ur: {
         appTitle: "آڈیو ٹرانسکرپشن اور ترجمہ",
@@ -141,8 +152,12 @@ const UI_STRINGS = {
         instructionsStep1: "براؤزر کے ایڈریس بار میں آئیکن پر کلک کریں",
         instructionsStep2: "مائیکروفون کی اجازت کو \"اجازت دیں\" پر سیٹ کریں",
         instructionsStep3: "صفحہ کو ریفریش کریں اور دوبارہ کوشش کریں",
+        inputModeRecord: "ریکارڈ",
+        inputModeUpload: "اپ لوڈ",
         recordCardTitle: "ریکارڈنگ",
         startRecordingLabel: "ریکارڈنگ شروع کریں",
+        visualizerIdleHint: "آڈیو لیول یہاں ظاہر ہوں گے",
+        maxRecordingLengthReached: "ریکارڈنگ کی زیادہ سے زیادہ حد مکمل ہو گئی — ریکارڈنگ خودکار طور پر رک گئی۔",
         statusReady: "تیار ہے",
         statusRecording: "ریکارڈنگ جاری ہے",
         statusPaused: "ریکارڈنگ رکی ہوئی ہے",
@@ -242,6 +257,13 @@ const UI_STRINGS = {
         noAudioAvailable: "(بغیر نام)",
         untitled: "(بلا عنوان)",
         exportHistoryEmpty: "ایکسپورٹ کے لیے کوئی ریکارڈنگ نہیں۔",
+        bulkSelectedCount: "{n} منتخب",
+        bulkClearSelection: "انتخاب صاف کریں",
+        bulkDeleteSelected: "منتخب حذف کریں",
+        bulkDeleteConfirm: "کیا آپ {n} منتخب ریکارڈنگز حذف کرنا چاہتے ہیں؟ اسے واپس نہیں لیا جا سکتا۔",
+        bulkDeleteSuccess: "{n} ریکارڈنگز حذف کر دی گئیں۔",
+        bulkDeletePartial: "{succeeded} حذف ہوئیں، {failed} ناکام رہیں۔",
+        downloadAudioAria: "آڈیو ڈاؤن لوڈ کریں",
     },
 };
 
@@ -381,9 +403,14 @@ function wordCount(str) {
 const step1 = document.getElementById("step1");
 const instructions = document.getElementById("instructions");
 const recordSection = document.getElementById("recordSection");
+const inputModeRecordBtn = document.getElementById("inputModeRecordBtn");
+const inputModeUploadBtn = document.getElementById("inputModeUploadBtn");
+const recordModePanel = document.getElementById("recordModePanel");
+const uploadModePanel = document.getElementById("uploadModePanel");
 const startBtn = document.getElementById("startBtn");
 const pauseBtn = document.getElementById("pauseBtn");
 const pauseBtnLabel = document.getElementById("pauseBtnLabel");
+const pauseBtnIcon = document.getElementById("pauseBtnIcon");
 const stopBtn = document.getElementById("stopBtn");
 const urduText = document.getElementById("urduText");
 const englishText = document.getElementById("englishText");
@@ -397,6 +424,7 @@ const translateErrorText = document.getElementById("translateErrorText");
 const staleNotice = document.getElementById("staleNotice");
 const recordingStatus = document.getElementById("recordingStatus");
 const recordingTime = document.getElementById("recordingTime");
+const recordProgress = document.getElementById("recordProgress");
 const clearBtn = document.getElementById("clearBtn");
 const audioFileInput = document.getElementById("audioFileInput");
 const dropZone = document.getElementById("dropZone");
@@ -583,6 +611,22 @@ function updateTranslationWordCount() {
 }
 
 // ============================================================================
+// Record/Upload input-method switch - upload is hidden until the user
+// deliberately asks for it.
+// ============================================================================
+function setInputMode(mode) {
+    const recordMode = mode !== "upload";
+    recordModePanel.classList.toggle("hidden", !recordMode);
+    uploadModePanel.classList.toggle("hidden", recordMode);
+    inputModeRecordBtn.classList.toggle("active", recordMode);
+    inputModeUploadBtn.classList.toggle("active", !recordMode);
+    inputModeRecordBtn.setAttribute("aria-selected", String(recordMode));
+    inputModeUploadBtn.setAttribute("aria-selected", String(!recordMode));
+}
+inputModeRecordBtn.addEventListener("click", () => setInputMode("record"));
+inputModeUploadBtn.addEventListener("click", () => setInputMode("upload"));
+
+// ============================================================================
 // Mic permission
 // ============================================================================
 const permissionBtn = document.getElementById("permissionBtn");
@@ -617,6 +661,9 @@ function requestMicPermission() {
 // ============================================================================
 // Recording timer / pause
 // ============================================================================
+const MAX_RECORDING_SECONDS = 600; // matches the "10:00" shown next to the timer
+const RECORDING_WARNING_SECONDS = 30; // last 30s before the cap: timer/progress turn amber
+
 function formatTime(timeInSeconds) {
     const minutes = Math.floor(timeInSeconds / 60);
     const seconds = timeInSeconds % 60;
@@ -627,7 +674,26 @@ function updateRecordingTime() {
     if (!recordingStartTime) return;
     const elapsedSeconds = Math.floor((Date.now() - recordingStartTime) / 1000);
     recordingTime.textContent = formatTime(elapsedSeconds);
+    recordProgress.value = Math.min(elapsedSeconds, MAX_RECORDING_SECONDS);
+
+    const nearingLimit = elapsedSeconds >= MAX_RECORDING_SECONDS - RECORDING_WARNING_SECONDS;
+    recordingTime.classList.toggle("time-warning", nearingLimit);
+    recordProgress.classList.toggle("time-warning", nearingLimit);
+
+    if (elapsedSeconds >= MAX_RECORDING_SECONDS) {
+        showToast(t("maxRecordingLengthReached"));
+        stopRecording();
+    }
 }
+
+function resetRecordingProgress() {
+    recordProgress.value = 0;
+    recordingTime.classList.remove("time-warning");
+    recordProgress.classList.remove("time-warning");
+}
+
+const PAUSE_ICON_PATHS = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+const PLAY_TRIANGLE_ICON_PATHS = '<polygon points="6 3 20 12 6 21 6 3"/>';
 
 function togglePauseRecording() {
     if (!mediaRecorder) return;
@@ -636,6 +702,7 @@ function togglePauseRecording() {
         clearInterval(recordingTimer);
         recordingPausedAt = Date.now();
         pauseBtnLabel.textContent = t("resumeBtn");
+        pauseBtnIcon.innerHTML = PLAY_TRIANGLE_ICON_PATHS;
         recordingStatus.textContent = t("statusPaused");
         stopVisualizer();
     } else if (mediaRecorder.state === "paused") {
@@ -643,6 +710,7 @@ function togglePauseRecording() {
         recordingStartTime += Date.now() - recordingPausedAt;
         recordingTimer = setInterval(updateRecordingTime, 1000);
         pauseBtnLabel.textContent = t("pauseBtn");
+        pauseBtnIcon.innerHTML = PAUSE_ICON_PATHS;
         recordingStatus.textContent = t("statusRecording");
         startVisualizer(recordingStream);
     }
@@ -932,8 +1000,9 @@ function triggerTranslate() {
         .catch(function (err) {
             logDebug("Translation error: " + err.message);
             lastFailedAction = { type: "translate" };
-            showErrorBanner(t("translationErrorToast") + " " + err.message, err.requestId ? `requestId: ${err.requestId}\n${err.message}` : err.message);
-            showToast(t("translationErrorToast"), "error");
+            const fullMessage = t("translationErrorToast") + " " + err.message;
+            showErrorBanner(fullMessage, err.requestId ? `requestId: ${err.requestId}\n${err.message}` : err.message);
+            showToast(fullMessage, "error");
         })
         .finally(function () {
             translateInFlight = false;
@@ -971,6 +1040,8 @@ function startRecording() {
     resetWorkspaceState();
     clearPendingFile();
     audioChunks = [];
+    resetRecordingProgress();
+    pauseBtnIcon.innerHTML = PAUSE_ICON_PATHS;
 
     recordingStatus.textContent = t("statusRecording");
 
@@ -1025,7 +1096,9 @@ function startRecording() {
         })
         .catch(function (err) {
             logDebug("Error starting recording: " + err.message);
-            showErrorBanner(t("micErrorGeneric") + " " + err.message);
+            const fullMessage = t("micErrorGeneric") + " " + err.message;
+            showErrorBanner(fullMessage);
+            showToast(fullMessage, "error");
             recordingStatus.textContent = t("statusReady");
         });
 }
@@ -1068,7 +1141,7 @@ function stopRecording() {
 
             logDebug("Created blob: " + audioBlob.size + " bytes, type: " + audioType);
 
-            const audioFile = new File([audioBlob], `recording.${fileExt}`, {
+            const audioFile = new File([audioBlob], timestampedRecordingName(fileExt), {
                 type: audioType,
                 lastModified: Date.now(),
             });
@@ -1115,7 +1188,7 @@ function createPendingAudioForIOS() {
         const audioBlob = new Blob(audioChunks, { type: audioType });
         logDebug("Created iOS blob: " + audioBlob.size + " bytes, type: " + audioType);
 
-        const audioFile = new File([audioBlob], `recording.${fileExt}`, {
+        const audioFile = new File([audioBlob], timestampedRecordingName(fileExt), {
             type: audioType,
             lastModified: Date.now(),
         });
@@ -1123,7 +1196,9 @@ function createPendingAudioForIOS() {
         addPendingFile(audioFile, "recorded");
     } catch (error) {
         logDebug("Error creating iOS audio file: " + error.message);
-        showErrorBanner("Error creating the audio file: " + error.message);
+        const fullMessage = "Error creating the audio file: " + error.message;
+        showErrorBanner(fullMessage);
+        showToast(fullMessage, "error");
     }
 }
 
@@ -1162,6 +1237,13 @@ dropZone.addEventListener("keydown", (e) => {
     }
 });
 
+function timestampedRecordingName(ext) {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+    return `recording-${stamp}.${ext}`;
+}
+
 function formatBytes(bytes) {
     if (!bytes && bytes !== 0) return "";
     if (bytes < 1024) return `${bytes} B`;
@@ -1169,9 +1251,16 @@ function formatBytes(bytes) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function formatLabelFromFile(file) {
-    const ext = (file.name.split(".").pop() || "").toUpperCase();
-    return ext || (file.type.split("/")[1] || "").toUpperCase();
+// Every recording/upload is normalized to MP3 for storage regardless of the
+// format it started as (see lib/audioStorage.js) - so anything shown to the
+// user (staged file name, history filename, format label) should say MP3
+// too, not the browser's raw recording format (webm) or whatever the
+// original upload happened to be.
+const STORED_AUDIO_FORMAT_LABEL = "MP3";
+
+function toMp3DisplayName(name, fallback) {
+    const base = name ? name.replace(/\.[^./]+$/, "") : (fallback || "recording");
+    return `${base}.mp3`;
 }
 
 const MUSIC_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
@@ -1222,6 +1311,38 @@ async function downloadAsMp3(file, source, button) {
     }
 }
 
+// Persists a just-completed recording/upload to the History tab immediately
+// (status "pending", correctly source-tagged) so it's visible there even if
+// the user never presses "Transcribe audio". Fire-and-forget from the
+// caller's point of view; runTranscription() awaits pendingFile.savePromise
+// so it can reuse the resulting recordingId instead of uploading the audio
+// a second time.
+function saveRecordingToHistory(file, source) {
+    const formData = new FormData();
+    if (isIOS) formData.append("device", "ios");
+    else if (isMacOS) formData.append("device", "macos");
+    else if (isAndroid) formData.append("device", "android");
+    formData.append("source", source);
+    if (sourceLanguageSelect.value) formData.append("language", sourceLanguageSelect.value);
+    formData.append("file", file);
+
+    return fetch("/api/v1/recordings", { method: "POST", body: formData })
+        .then((res) => res.json().then((data) => {
+            if (!res.ok) throw new Error(data.error || "Could not save recording to history");
+            return data;
+        }))
+        .then((data) => {
+            if (pendingFile && pendingFile.file === file) {
+                pendingFile.recordingId = data.id;
+            }
+            return data.id;
+        })
+        .catch((err) => {
+            logDebug("Save-to-history error: " + err.message);
+            return null;
+        });
+}
+
 let currentFileItemEl = null;
 
 function clearPendingFile() {
@@ -1237,7 +1358,8 @@ function clearPendingFile() {
 
 function addPendingFile(file, source) {
     resetWorkspaceState();
-    pendingFile = { file, source };
+    pendingFile = { file, source, recordingId: null };
+    pendingFile.savePromise = saveRecordingToHistory(file, source);
     uploadFileList.innerHTML = "";
     recordFileList.innerHTML = "";
 
@@ -1258,8 +1380,8 @@ function addPendingFile(file, source) {
         <button type="button" class="icon-btn-tiny upload-download" aria-label="${t("downloadRecordingAria")}">${DOWNLOAD_ICON}</button>
         <button type="button" class="icon-btn-tiny upload-remove" aria-label="${t("removeFileAria")}">${X_ICON}</button>
     `;
-    item.querySelector(".upload-file-name").textContent = file.name;
-    item.querySelector(".upload-file-meta").textContent = `${formatBytes(file.size)} • ${formatLabelFromFile(file)}`;
+    item.querySelector(".upload-file-name").textContent = toMp3DisplayName(file.name);
+    item.querySelector(".upload-file-meta").textContent = `${formatBytes(file.size)} • ${STORED_AUDIO_FORMAT_LABEL}`;
     targetList.appendChild(item);
     currentFileItemEl = item;
 
@@ -1314,7 +1436,7 @@ function setFileItemError(item) {
 // ============================================================================
 // Transcription (real network call, triggered by "Transcribe audio")
 // ============================================================================
-function uploadRecordingXHR(file, source, onProgress) {
+function uploadRecordingXHR(file, source, recordingId, onProgress) {
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", "/api/v1/transcribe");
@@ -1341,7 +1463,14 @@ function uploadRecordingXHR(file, source, onProgress) {
         else if (isAndroid) formData.append("device", "android");
         formData.append("source", source);
         if (sourceLanguageSelect.value) formData.append("language", sourceLanguageSelect.value);
-        formData.append("file", file);
+        if (recordingId) {
+            // Already saved to history (see saveRecordingToHistory) - the
+            // server reuses that stored audio instead of re-uploading it.
+            formData.append("recordingId", recordingId);
+            onProgress(100);
+        } else {
+            formData.append("file", file);
+        }
 
         xhr.send(formData);
     });
@@ -1368,7 +1497,15 @@ function runTranscription() {
         setFileItemProgress(currentFileItemEl, 0);
     }
 
-    uploadRecordingXHR(file, source, (pct) => setFileItemProgress(currentFileItemEl, pct))
+    const capturedPendingFile = pendingFile;
+    // The recording/upload was already sent to the server once, in the
+    // background, as soon as it was staged (see saveRecordingToHistory) -
+    // wait for that to resolve so the recordingId can be reused instead of
+    // uploading the same audio a second time. If it hasn't resolved yet (or
+    // failed), fall back to a normal fresh upload rather than blocking.
+    Promise.resolve(capturedPendingFile.savePromise)
+        .catch(() => null)
+        .then(() => uploadRecordingXHR(file, source, capturedPendingFile.recordingId, (pct) => setFileItemProgress(currentFileItemEl, pct)))
         .then(function (data) {
             urduText.value = data.text || "";
             updateTranscriptionWordCount();
@@ -1391,9 +1528,10 @@ function runTranscription() {
         .catch(function (error) {
             logDebug("Transcription error: " + error.message);
             lastFailedAction = { type: "transcribe" };
-            showErrorBanner(t("transcriptionErrorToast") + " " + error.message, error.requestId ? `requestId: ${error.requestId}\nstatus: ${error.status}\n${error.message}` : error.message);
+            const fullMessage = t("transcriptionErrorToast") + " " + error.message;
+            showErrorBanner(fullMessage, error.requestId ? `requestId: ${error.requestId}\nstatus: ${error.status}\n${error.message}` : error.message);
             setFileItemError(currentFileItemEl);
-            showToast(t("transcriptionErrorToast"), "error");
+            showToast(fullMessage, "error");
         })
         .finally(function () {
             transcribing = false;
@@ -1445,6 +1583,83 @@ const filtersBadge = document.getElementById("filtersBadge");
 const filtersCount = document.getElementById("filtersCount");
 const historyClearBtn = document.getElementById("historyClearBtn");
 const exportHistoryBtn = document.getElementById("exportHistoryBtn");
+const historySelectAllCheckbox = document.getElementById("historySelectAllCheckbox");
+const historyBulkBar = document.getElementById("historyBulkBar");
+const historyBulkCount = document.getElementById("historyBulkCount");
+const historyBulkDeleteBtn = document.getElementById("historyBulkDeleteBtn");
+const historyBulkClearBtn = document.getElementById("historyBulkClearBtn");
+
+let selectedRecordingIds = new Set();
+let currentPageItems = [];
+
+function updateBulkBar() {
+    const n = selectedRecordingIds.size;
+    historyBulkBar.classList.toggle("hidden", n === 0);
+    historyBulkCount.textContent = t("bulkSelectedCount", { n });
+    if (currentPageItems.length > 0) {
+        historySelectAllCheckbox.checked = currentPageItems.every((item) => selectedRecordingIds.has(item.id));
+        historySelectAllCheckbox.indeterminate = n > 0 && !historySelectAllCheckbox.checked;
+    } else {
+        historySelectAllCheckbox.checked = false;
+        historySelectAllCheckbox.indeterminate = false;
+    }
+}
+
+function toggleRowSelection(id, checked) {
+    if (checked) selectedRecordingIds.add(id);
+    else selectedRecordingIds.delete(id);
+    document.querySelectorAll(`input.row-checkbox[data-id="${id}"], input.card-checkbox[data-id="${id}"]`)
+        .forEach((el) => { el.checked = checked; });
+    updateBulkBar();
+}
+
+historySelectAllCheckbox.addEventListener("change", () => {
+    const checked = historySelectAllCheckbox.checked;
+    for (const item of currentPageItems) {
+        if (checked) selectedRecordingIds.add(item.id);
+        else selectedRecordingIds.delete(item.id);
+    }
+    document.querySelectorAll("input.row-checkbox, input.card-checkbox").forEach((el) => { el.checked = checked; });
+    updateBulkBar();
+});
+
+historyBulkClearBtn.addEventListener("click", () => {
+    selectedRecordingIds.clear();
+    document.querySelectorAll("input.row-checkbox, input.card-checkbox").forEach((el) => { el.checked = false; });
+    updateBulkBar();
+});
+
+historyBulkDeleteBtn.addEventListener("click", () => {
+    const ids = [...selectedRecordingIds];
+    if (ids.length === 0) return;
+    if (!window.confirm(t("bulkDeleteConfirm", { n: ids.length }))) return;
+
+    Promise.allSettled(ids.map((id) => fetch(`/api/v1/recordings/${id}`, { method: "DELETE" })
+        .then((res) => {
+            if (!res.ok && res.status !== 204) throw new Error("Delete failed");
+        })))
+        .then((results) => {
+            const failed = results.filter((r) => r.status === "rejected").length;
+            const succeeded = results.length - failed;
+            selectedRecordingIds.clear();
+            if (failed === 0) {
+                showToast(t("bulkDeleteSuccess", { n: succeeded }), "success");
+            } else {
+                showToast(t("bulkDeletePartial", { succeeded, failed }), "error");
+            }
+            loadHistory();
+            loadStats();
+        });
+});
+
+function downloadRecordingAudio(id, originalFilename) {
+    const link = document.createElement("a");
+    link.href = `/api/v1/recordings/${id}/audio`;
+    link.download = toMp3DisplayName(originalFilename, id);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+}
 
 function statusLabel(status) {
     return t("status" + status.charAt(0).toUpperCase() + status.slice(1));
@@ -1523,12 +1738,6 @@ const STATUS_ICONS = {
     failed: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
 };
 
-function escapeHtml(str) {
-    const div = document.createElement("div");
-    div.textContent = str == null ? "" : str;
-    return div.innerHTML;
-}
-
 function formatDuration(seconds) {
     if (!seconds && seconds !== 0) return "—";
     return formatTime(Math.round(seconds));
@@ -1544,6 +1753,9 @@ function renderHistory(data) {
     historyStatusText.textContent = "";
     historyTableBody.innerHTML = "";
     historyCardList.innerHTML = "";
+    selectedRecordingIds.clear();
+    currentPageItems = data.items || [];
+    updateBulkBar();
 
     if (!data.items || data.items.length === 0) {
         historyTable.classList.add("hidden");
@@ -1600,14 +1812,15 @@ function buildTableRow(item) {
     const tr = document.createElement("tr");
     tr.tabIndex = 0;
     tr.setAttribute("role", "button");
-    const name = item.originalFilename || t("untitled");
+    const name = item.originalFilename ? toMp3DisplayName(item.originalFilename) : t("untitled");
     tr.innerHTML = `
+        <td class="col-select"><input type="checkbox" class="row-checkbox" data-id="${item.id}" aria-label="Select recording"></td>
         <td>
             <div class="rec-file-cell">
                 <span class="rec-file-icon" aria-hidden="true">${FILE_ICON}</span>
                 <div>
                     <div class="rec-file-name"></div>
-                    <div class="rec-file-meta">${escapeHtml((item.mimeType || "").split("/")[1] || "")}${item.fileSizeBytes ? " • " + formatBytes(item.fileSizeBytes) : ""}</div>
+                    <div class="rec-file-meta">${STORED_AUDIO_FORMAT_LABEL}${item.fileSizeBytes ? " • " + formatBytes(item.fileSizeBytes) : ""}</div>
                 </div>
             </div>
         </td>
@@ -1619,6 +1832,7 @@ function buildTableRow(item) {
         <td>
             <div class="row-actions">
                 <button type="button" class="icon-btn row-play-btn" aria-label="Open">${PLAY_ICON}</button>
+                <button type="button" class="icon-btn row-download-btn" aria-label="${t("downloadAudioAria")}">${DOWNLOAD_ICON}</button>
                 <button type="button" class="icon-btn row-delete-btn" aria-label="Delete">${TRASH_ICON}</button>
             </div>
         </td>
@@ -1626,7 +1840,10 @@ function buildTableRow(item) {
     tr.querySelector(".rec-file-name").textContent = name;
     tr.addEventListener("click", () => openHistoryDetail(item.id));
     tr.addEventListener("keydown", (e) => { if (e.key === "Enter") openHistoryDetail(item.id); });
+    tr.querySelector(".row-checkbox").addEventListener("click", (e) => e.stopPropagation());
+    tr.querySelector(".row-checkbox").addEventListener("change", (e) => toggleRowSelection(item.id, e.target.checked));
     tr.querySelector(".row-play-btn").addEventListener("click", (e) => { e.stopPropagation(); openHistoryDetail(item.id); });
+    tr.querySelector(".row-download-btn").addEventListener("click", (e) => { e.stopPropagation(); downloadRecordingAudio(item.id, item.originalFilename); });
     tr.querySelector(".row-delete-btn").addEventListener("click", (e) => { e.stopPropagation(); quickDelete(item.id); });
     return tr;
 }
@@ -1634,16 +1851,18 @@ function buildTableRow(item) {
 function buildCard(item) {
     const card = document.createElement("div");
     card.className = "history-item-card";
-    const name = item.originalFilename || t("untitled");
+    const name = item.originalFilename ? toMp3DisplayName(item.originalFilename) : t("untitled");
     card.innerHTML = `
         <div class="history-item-top">
+            <input type="checkbox" class="card-checkbox" data-id="${item.id}" aria-label="Select recording">
             <span class="rec-file-icon" aria-hidden="true">${FILE_ICON}</span>
             <div class="history-item-info">
                 <div class="history-item-name"></div>
-                <div class="history-item-meta">${escapeHtml((item.mimeType || "").split("/")[1] || "")}${item.fileSizeBytes ? " • " + formatBytes(item.fileSizeBytes) : ""}</div>
+                <div class="history-item-meta">${STORED_AUDIO_FORMAT_LABEL}${item.fileSizeBytes ? " • " + formatBytes(item.fileSizeBytes) : ""}</div>
             </div>
             <div class="row-actions">
                 <button type="button" class="icon-btn row-play-btn" aria-label="Open">${PLAY_ICON}</button>
+                <button type="button" class="icon-btn row-download-btn" aria-label="${t("downloadAudioAria")}">${DOWNLOAD_ICON}</button>
                 <button type="button" class="icon-btn row-delete-btn" aria-label="Delete">${TRASH_ICON}</button>
             </div>
         </div>
@@ -1661,7 +1880,10 @@ function buildCard(item) {
     `;
     card.querySelector(".history-item-name").textContent = name;
     card.addEventListener("click", () => openHistoryDetail(item.id));
+    card.querySelector(".card-checkbox").addEventListener("click", (e) => e.stopPropagation());
+    card.querySelector(".card-checkbox").addEventListener("change", (e) => toggleRowSelection(item.id, e.target.checked));
     card.querySelector(".row-play-btn").addEventListener("click", (e) => { e.stopPropagation(); openHistoryDetail(item.id); });
+    card.querySelector(".row-download-btn").addEventListener("click", (e) => { e.stopPropagation(); downloadRecordingAudio(item.id, item.originalFilename); });
     card.querySelector(".row-delete-btn").addEventListener("click", (e) => { e.stopPropagation(); quickDelete(item.id); });
     return card;
 }

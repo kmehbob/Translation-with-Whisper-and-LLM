@@ -483,13 +483,22 @@ main { display: block; }
     border-radius: var(--radius-md);
     font-size: 12.5px;
     margin: 8px 0;
+    /* Fades + drops in instead of popping into place the instant .hidden is
+       removed - this re-plays every time the element re-enters the render
+       tree (i.e. each time it goes from display:none to visible). */
+    animation: banner-in 0.22s ease;
 }
 
 .banner svg { width: 20px; height: 20px; flex-shrink: 0; margin-top: 1px; }
 
-.banner-error { background: var(--danger-soft); color: var(--danger);display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radius-md); font-size: 12.5px; margin: 8px 0; }
+.banner-error { background: var(--danger-soft); color: var(--danger); align-items: center; }
 .banner-success { background: var(--success-soft); color: var(--success); }
 .banner-info { background: var(--info-soft); color: var(--info); }
+
+@keyframes banner-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 
 .banner-body { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .banner-body p { flex: 1; min-width: 180px; }
@@ -548,6 +557,47 @@ main { display: block; }
 .live-col-input, .live-col-workspace { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 
 .live-col-scroll { display: flex; flex-direction: column; gap: 12px; }
+
+/* Record/Upload input-method switch - upload stays out of the way until
+   the user actually wants it. */
+.input-mode-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    padding: 3px;
+    border-radius: 12px;
+    flex-shrink: 0;
+}
+
+.input-mode-tabs button {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: none;
+    background: transparent;
+    padding: 8px 10px;
+    border-radius: 9px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.input-mode-tabs button svg { width: 15px; height: 15px; }
+
+.input-mode-tabs button.active {
+    background: var(--surface);
+    color: var(--primary);
+    box-shadow: var(--shadow-sm);
+}
+
+#recordModePanel, #uploadModePanel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
 
 @media (min-width: 960px) {
     .live-grid { grid-template-columns: 360px 1fr; align-items: start; }
@@ -677,17 +727,40 @@ main { display: block; }
     100% { box-shadow: 0 0 0 5px var(--danger-soft); }
 }
 
-#visualizer {
+.visualizer-wrap {
+    position: relative;
     flex: 1;
     min-width: 140px;
+}
+
+#visualizer {
+    width: 100%;
     height: 46px;
     background: var(--surface-alt);
     border-radius: var(--radius-md);
     display: block;
 }
 
+.visualizer-hint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--text-faint);
+    font-family: var(--font-sans);
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
+.recording-active .visualizer-hint { opacity: 0; }
+
 .record-time-row {
     margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
     font-size: 13px;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
@@ -695,6 +768,24 @@ main { display: block; }
 }
 
 .recording-time { color: var(--danger); font-weight: 700; }
+
+#recordingTime.time-warning { color: var(--warning); }
+
+.record-progress {
+    width: 100%;
+    height: 4px;
+    border-radius: 999px;
+    overflow: hidden;
+    appearance: none;
+    border: none;
+}
+
+.record-progress::-webkit-progress-bar { background: var(--border); border-radius: 999px; }
+.record-progress::-webkit-progress-value { background: var(--accent-teal); border-radius: 999px; transition: width 0.3s linear, background-color 0.2s ease; }
+.record-progress::-moz-progress-bar { background: var(--accent-teal); border-radius: 999px; transition: width 0.3s linear, background-color 0.2s ease; }
+
+.record-progress.time-warning::-webkit-progress-value { background: var(--warning); }
+.record-progress.time-warning::-moz-progress-bar { background: var(--warning); }
 
 /* Upload / drop zone */
 .drop-zone {
@@ -781,11 +872,14 @@ main { display: block; }
 .upload-file-item.is-done .upload-percent { color: var(--success); }
 .upload-file-item.is-error .upload-percent { color: var(--danger); }
 
-/* Language row */
+/* Language row - sits with the translate action, not the transcribe one,
+   since target language only ever matters for translation. */
 .language-row {
     display: flex;
     align-items: flex-end;
     gap: 10px;
+    max-width: 480px;
+    margin-top: 12px;
 }
 
 .language-field { flex: 1; min-width: 0; }
@@ -1091,6 +1185,36 @@ main { display: block; }
 
 .filters-badge { margin-inline-start: auto; }
 
+.history-bulk-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    background: var(--primary-soft);
+    border: 1px solid var(--primary);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.history-bulk-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.row-checkbox, .card-checkbox, #historySelectAllCheckbox {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+.history-table th.col-select, .history-table td.col-select {
+    width: 32px;
+    padding-inline-end: 0;
+}
+
 .history-table {
     width: 100%;
     border-collapse: collapse;
@@ -1182,6 +1306,7 @@ main { display: block; }
 .history-item-card:hover { border-color: var(--text-faint); }
 
 .history-item-top { display: flex; align-items: flex-start; gap: 10px; }
+.history-item-top .card-checkbox { margin-top: 10px; flex-shrink: 0; }
 .history-item-top .rec-file-icon { width: 38px; height: 38px; }
 .history-item-info { flex: 1; min-width: 0; }
 .history-item-name { font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1339,7 +1464,7 @@ main { display: block; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .toast, .btn, .drop-zone, .mic-circle-btn, .status-dot, .spinner, .dropdown-chevron, .tech-details-toggle svg {
+    .toast, .banner, .btn, .drop-zone, .mic-circle-btn, .status-dot, .spinner, .dropdown-chevron, .tech-details-toggle svg {
         animation: none !important;
         transition: none !important;
     }

@@ -1,15 +1,92 @@
 const express = require("express");
 const fs = require("fs");
+const path = require("path");
+const multer = require("multer");
 
+const config = require("../lib/config");
 const logger = require("../lib/logger");
 const recordingsRepo = require("../lib/recordingsRepo");
 const audioStorage = require("../lib/audioStorage");
 const { exportRecording, SUPPORTED_FORMATS } = require("../lib/exporters");
 const { requireClientApiKey } = require("../middleware/auth");
+const { transcribeLimiter } = require("../lib/rateLimiters");
 
 const router = express.Router();
 
 router.use(requireClientApiKey);
+
+// Same allow-list/naming guard as routes/transcribe.js - kept duplicated
+// rather than shared, so this route can't accidentally regress if that
+// file's upload handling changes independently.
+const ALLOWED_MIMES = [
+    "audio/webm",
+    "audio/mp3",
+    "audio/mpeg",
+    "audio/mp4",
+    "audio/wav",
+    "audio/x-wav",
+    "audio/ogg",
+    "audio/aac",
+    "audio/flac",
+    "audio/x-flac",
+    "audio/x-m4a",
+];
+
+const EXT_BY_MIME = {
+    "audio/mp3": "mp3",
+    "audio/mpeg": "mp3",
+    "audio/mp4": "m4a",
+    "audio/x-m4a": "m4a",
+    "audio/webm": "webm",
+    "audio/wav": "wav",
+    "audio/x-wav": "wav",
+    "audio/ogg": "ogg",
+    "audio/aac": "aac",
+    "audio/flac": "flac",
+    "audio/x-flac": "flac",
+};
+
+const uploadsDir = path.join(__dirname, "..", "uploads");
+fs.mkdirSync(uploadsDir, { recursive: true });
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadsDir),
+    filename: (req, file, cb) => {
+        const ext = EXT_BY_MIME[file.mimetype] || "bin";
+        cb(null, `save-${Date.now()}-${Math.round(Math.random() * 1e9)}.${ext}`);
+    },
+});
+
+function fileFilter(req, file, cb) {
+    if (ALLOWED_MIMES.includes(file.mimetype)) return cb(null, true);
+    if (req.body.device === "ios") return cb(null, true);
+    cb(new Error(`Unsupported file type: ${file.mimetype}`));
+}
+
+const upload = multer({
+    storage,
+    fileFilter,
+    limits: { fileSize: config.maxAudioUploadMb * 1024 * 1024 },
+});
+
+async function deleteTransientFile(filePath) {
+    if (!filePath) return;
+    const maxAttempts = 5;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await fs.promises.unlink(filePath);
+            return;
+        } catch (err) {
+            if (err.code === "ENOENT") return;
+            const retryable = err.code === "EBUSY" || err.code === "EPERM";
+            if (!retryable || attempt === maxAttempts) {
+                logger.warn("temp_recording_save_delete_failed", { code: err.code });
+                return;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
+        }
+    }
+}
 
 // Publicly-safe projection - never leak the on-disk stored filename/path.
 function toPublicShape(recording) {
@@ -41,6 +118,58 @@ router.get("/", (req, res) => {
         pageSize: result.pageSize,
     });
 });
+
+// Persists a completed recording/upload to history WITHOUT transcribing it -
+// so it shows up (correctly tagged recorded/uploaded, status "pending")
+// even if the user never presses "Transcribe audio". routes/transcribe.js
+// accepts this row's id afterwards and transcribes the already-stored audio
+// in place instead of creating a second, duplicate row.
+router.post(
+    "/",
+    transcribeLimiter,
+    (req, res, next) => {
+        upload.single("file")(req, res, (err) => {
+            if (err) {
+                if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+                    return res.status(413).json({ error: "Audio file exceeds the maximum allowed size", requestId: req.id });
+                }
+                return res.status(400).json({ error: "Invalid or unsupported audio upload", requestId: req.id });
+            }
+            next();
+        });
+    },
+    async (req, res, next) => {
+        const uploadedPath = req.file?.path;
+        try {
+            if (!req.file) {
+                return res.status(400).json({ error: "No audio file was provided", requestId: req.id });
+            }
+
+            const sourceType = req.body.source === "uploaded" ? "uploaded" : "recorded";
+            const sourceLanguage = (req.body.language || config.defaultSourceLanguage || "auto").trim();
+
+            const converted = await audioStorage.convertToMp3(uploadedPath);
+            const durationSeconds = await audioStorage.probeDurationSeconds(converted.storedPath);
+
+            const recording = recordingsRepo.create({
+                sourceType,
+                originalFilename: req.file.originalname || null,
+                storedFilename: converted.storedFilename,
+                mimeType: "audio/mpeg",
+                fileSizeBytes: converted.fileSizeBytes,
+                sourceLanguage,
+            });
+            recordingsRepo.update(recording.id, { duration_seconds: durationSeconds });
+
+            logger.info("recording_saved_pending", { requestId: req.id, recordingId: recording.id, sourceType });
+            res.status(201).json(toPublicShape(recordingsRepo.getById(recording.id)));
+        } catch (err) {
+            next(err);
+        } finally {
+            await deleteTransientFile(uploadedPath);
+        }
+    }
+);
 
 router.get("/:id", (req, res) => {
     const recording = recordingsRepo.getById(req.params.id);
