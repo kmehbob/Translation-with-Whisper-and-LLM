@@ -52,6 +52,8 @@ guard = BoundedConcurrency(config.MAX_CONCURRENT_TRANSLATIONS)
 
 class TranslateRequest(BaseModel):
     text: str = Field(..., min_length=0)
+    sourceLanguage: str = Field(default="ur")
+    targetLanguage: str = Field(default="en")
 
 
 def verify_token(authorization: str = Header(default="")):
@@ -91,15 +93,20 @@ async def translate(request: Request, payload: TranslateRequest, _: None = Depen
     if not acquired:
         raise HTTPException(status_code=503, detail="Translation service is busy, please try again shortly")
 
+    source_language = payload.sourceLanguage.strip() or "ur"
+    target_language = payload.targetLanguage.strip() or "en"
+
     try:
         started = time.monotonic()
-        translation = await run_translation(request, text)
+        translation = await run_translation(request, text, source_language, target_language)
         log(
             logger,
             "info",
             "translation_completed",
             duration_ms=round((time.monotonic() - started) * 1000),
             input_length=len(text),
+            source_language=source_language,
+            target_language=target_language,
         )
         return JSONResponse({"translation": translation})
     except HTTPException:
@@ -111,8 +118,11 @@ async def translate(request: Request, payload: TranslateRequest, _: None = Depen
         await guard.release()
 
 
-async def run_translation(request: Request, text: str):
+async def run_translation(request: Request, text: str, source_language, target_language):
     batches = build_batches(text, model_backend.count_tokens, config.MAX_INPUT_TOKENS_PER_CHUNK)
+
+    def translate_chunk(chunk_text):
+        return model_backend.translate_one(chunk_text, source_language, target_language)
 
     translated = []
     for batch in batches:
@@ -122,14 +132,14 @@ async def run_translation(request: Request, text: str):
         if batch["kind"] == "verbatim":
             translated.append(batch["text"])
         elif batch["kind"] == "model":
-            translated.append(await asyncio.to_thread(model_backend.translate_one, batch["text"]))
+            translated.append(await asyncio.to_thread(translate_chunk, batch["text"]))
         elif batch["kind"] == "sentence_join":
             translated_pieces = []
             for piece in batch["pieces"]:
                 if piece["is_sep"]:
                     translated_pieces.append(piece["text"])
                 else:
-                    translated_pieces.append(await asyncio.to_thread(model_backend.translate_one, piece["text"]))
+                    translated_pieces.append(await asyncio.to_thread(translate_chunk, piece["text"]))
             translated.append("".join(translated_pieces))
         else:  # pragma: no cover - defensive, chunker only emits the kinds above
             raise RuntimeError(f"Unknown batch kind: {batch['kind']}")

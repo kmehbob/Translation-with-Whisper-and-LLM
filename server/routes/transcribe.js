@@ -10,6 +10,8 @@ const concurrencyGuard = require("../lib/concurrencyGuard");
 const { transcribeLimiter } = require("../lib/rateLimiters");
 const { requireClientApiKey } = require("../middleware/auth");
 const { createServiceClient, callService } = require("../lib/serviceClient");
+const audioStorage = require("../lib/audioStorage");
+const recordingsRepo = require("../lib/recordingsRepo");
 
 const router = express.Router();
 
@@ -19,8 +21,12 @@ const ALLOWED_MIMES = [
     "audio/mpeg",
     "audio/mp4",
     "audio/wav",
+    "audio/x-wav",
     "audio/ogg",
     "audio/aac",
+    "audio/flac",
+    "audio/x-flac",
+    "audio/x-m4a",
 ];
 
 const uploadsDir = path.join(__dirname, "..", "uploads");
@@ -30,10 +36,14 @@ const EXT_BY_MIME = {
     "audio/mp3": "mp3",
     "audio/mpeg": "mp3",
     "audio/mp4": "m4a",
+    "audio/x-m4a": "m4a",
     "audio/webm": "webm",
     "audio/wav": "wav",
+    "audio/x-wav": "wav",
     "audio/ogg": "ogg",
     "audio/aac": "aac",
+    "audio/flac": "flac",
+    "audio/x-flac": "flac",
 };
 
 const storage = multer.diskStorage({
@@ -65,12 +75,14 @@ const upload = multer({
 
 const transcriptionClient = createServiceClient(config.transcriptionServiceUrl, config.transcribeTimeoutMs);
 
-async function deleteUploadedFile(filePath) {
+async function deleteTransientFile(filePath) {
     if (!filePath) return;
-    // On some platforms (notably Windows) a file can't be unlinked while the
-    // read stream we forwarded it with is still releasing its handle, so a
-    // transient EBUSY/EPERM right after the request completes is expected -
-    // retry briefly before giving up and logging.
+    // On some platforms (notably Windows) a file can't be unlinked while a
+    // read stream against it is still releasing its handle, so a transient
+    // EBUSY/EPERM right after use is expected - retry briefly before giving
+    // up and logging. This is the short-lived upload/conversion staging
+    // file, not the permanent recording (see docs/AI_FEATURE.md for the
+    // data-retention policy: uploads/ is always transient, recordings/ persists).
     const maxAttempts = 5;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
@@ -107,17 +119,40 @@ router.post(
     async (req, res, next) => {
         const startedAt = Date.now();
         const uploadedPath = req.file?.path;
+        const sourceType = req.body.source === "uploaded" ? "uploaded" : "recorded";
+        const sourceLanguage = (req.body.language || config.defaultSourceLanguage || "auto").trim();
+
+        let recording = null;
 
         try {
             if (!req.file) {
                 return res.status(400).json({ error: "No audio file was provided", requestId: req.id });
             }
 
-            const formData = new FormData();
-            formData.append("file", fs.createReadStream(uploadedPath), {
-                filename: req.file.filename,
-                contentType: req.file.mimetype,
+            // Every recording is normalized to MP3 for permanent storage,
+            // regardless of the format it arrived in (webm from the
+            // browser recorder, or any of the uploadable formats above).
+            const converted = await audioStorage.convertToMp3(uploadedPath);
+            const durationSeconds = await audioStorage.probeDurationSeconds(converted.storedPath);
+
+            recording = recordingsRepo.create({
+                sourceType,
+                originalFilename: req.file.originalname || null,
+                storedFilename: converted.storedFilename,
+                mimeType: "audio/mpeg",
+                fileSizeBytes: converted.fileSizeBytes,
+                sourceLanguage,
             });
+            recordingsRepo.update(recording.id, { status: "transcribing", duration_seconds: durationSeconds });
+
+            const formData = new FormData();
+            formData.append("file", fs.createReadStream(converted.storedPath), {
+                filename: converted.storedFilename,
+                contentType: "audio/mpeg",
+            });
+            if (sourceLanguage && sourceLanguage !== "auto") {
+                formData.append("language", sourceLanguage);
+            }
 
             const result = await callService({
                 client: transcriptionClient,
@@ -129,22 +164,37 @@ router.post(
                 axiosOpts: { headers: formData.getHeaders() },
             });
 
+            const detectedLanguage = result.language || sourceLanguage;
+            recordingsRepo.update(recording.id, {
+                status: "transcribed",
+                source_language: detectedLanguage,
+                transcription_text: result.text || "",
+            });
+
             logger.info("transcription_completed", {
                 requestId: req.id,
+                recordingId: recording.id,
                 durationMs: Date.now() - startedAt,
-                audioBytes: req.file.size,
+                audioBytes: converted.fileSizeBytes,
             });
 
             res.json({
                 requestId: req.id,
+                recordingId: recording.id,
                 text: result.text || "",
-                language: result.language || "ur",
+                language: detectedLanguage,
                 durationMs: Date.now() - startedAt,
             });
         } catch (err) {
+            if (recording) {
+                recordingsRepo.update(recording.id, {
+                    status: "failed",
+                    error_message: err.publicMessage || "Transcription failed",
+                });
+            }
             next(err);
         } finally {
-            await deleteUploadedFile(uploadedPath);
+            await deleteTransientFile(uploadedPath);
         }
     }
 );

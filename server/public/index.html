@@ -4,82 +4,220 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>اردو آڈیو ٹرانسکرپشن اور ترجمہ</title>
+    <title>آڈیو ٹرانسکرپشن اور ترجمہ</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Step 1: Permission Request -->
-    <div id="step1" class="container">
-        <h1>مائیکروفون کی اجازت</h1>
-        <p>اس ایپ کو آپ کی آواز ریکارڈ کرنے کے لیے مائیکروفون کی اجازت درکار ہے۔</p>
-        <button id="permissionBtn" type="button">مائیکروفون کی اجازت دیں</button>
-        <div id="errorMsg" class="message error hidden" role="alert"></div>
-        <div id="instructions" class="hidden">
-            <h3>اگر آپ کو اجازت ڈائیلاگ نہیں دکھایا گیا:</h3>
-            <ol>
-                <li>براؤزر کے ایڈریس بار میں آئیکن پر کلک کریں</li>
-                <li>مائیکروفون کی اجازت کو "اجازت دیں" پر سیٹ کریں</li>
-                <li>صفحہ کو ریفریش کریں اور دوبارہ کوشش کریں</li>
-            </ol>
-        </div>
-    </div>
+    <header class="app-header">
+        <h1>آڈیو ٹرانسکرپشن اور ترجمہ</h1>
+        <nav class="tabs" role="tablist" aria-label="اہم حصے">
+            <button type="button" class="tab active" id="tabBtnCreate" role="tab" aria-selected="true" aria-controls="tabCreate">🎙️ نیا</button>
+            <button type="button" class="tab" id="tabBtnHistory" role="tab" aria-selected="false" aria-controls="tabHistory">🕘 ہسٹری</button>
+        </nav>
+    </header>
 
-    <!-- Step 2: Recording, editing and translation interface -->
-    <div id="step2" class="container hidden">
-        <h1>اردو آڈیو ریکارڈنگ اور انگریزی ترجمہ</h1>
-        <div id="successMsg" class="message success">مائیکروفون کی اجازت مل گئی!</div>
+    <main>
+    <!-- ==================== CREATE TAB ==================== -->
+    <div id="tabCreate" class="tab-panel" role="tabpanel" aria-labelledby="tabBtnCreate">
 
-        <div class="status-text">
-            <span id="recordingStatus">ریکارڈنگ تیار ہے</span>
-            <span id="recordingTime" class="recording-time hidden">00:00</span>
-        </div>
-
-        <div class="button-container">
-            <button id="startBtn" type="button">
-                <span class="recording-indicator"></span>
-               🔴 ریکارڈنگ شروع کریں
-            </button>
-            <button id="stopBtn" type="button" disabled>
-                <span class="recording-indicator"></span>
-                ⏹ ریکارڈنگ روکیں
-            </button>
-            <button id="clearBtn" type="button">🗑️ صاف کریں</button>
-        </div>
-
-        <div class="upload-row">
-            <label for="audioFileInput">یا پہلے سے ریکارڈ شدہ آڈیو فائل اپ لوڈ کریں:</label>
-            <input type="file" id="audioFileInput" accept="audio/webm,audio/mp3,audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/aac">
-        </div>
-
-        <div class="outputs-grid">
-            <div class="output-container">
-                <h3 id="urduLabel">اردو متن (قابلِ ترمیم)</h3>
-                <label for="urduText" class="sr-only">اردو متن، آپ اسے یہاں ٹائپ یا ترمیم کر سکتے ہیں</label>
-                <textarea id="urduText" aria-labelledby="urduLabel" placeholder="یہاں اردو متن ٹائپ کریں یا ریکارڈنگ کا انتظار کریں..."></textarea>
-                <div class="output-actions">
-                    <button id="copyUrduBtn" type="button">📋 اردو کاپی کریں</button>
-                    <button id="translateBtn" type="button" disabled>🌐 انگریزی میں ترجمہ کریں</button>
-                </div>
-            </div>
-
-            <div class="output-container">
-                <h3 id="englishLabel">
-                    English Translation
-                    <span id="staleNotice" class="stale-badge hidden">⚠ Outdated — translate again</span>
-                </h3>
-                <label for="englishText" class="sr-only">English translation output, read only</label>
-                <textarea id="englishText" readonly aria-labelledby="englishLabel" placeholder="Translation will appear here"></textarea>
-                <div class="output-actions">
-                    <button id="copyEnglishBtn" type="button" disabled>📋 Copy English</button>
-                </div>
+        <!-- Mic permission gate -->
+        <div id="step1" class="container">
+            <h2>مائیکروفون کی اجازت</h2>
+            <p>ریکارڈنگ کے لیے مائیکروفون کی اجازت درکار ہے۔ آپ اجازت کے بغیر بھی فائل اپ لوڈ کر سکتے ہیں یا متن ٹائپ کر سکتے ہیں۔</p>
+            <button id="permissionBtn" type="button">مائیکروفون کی اجازت دیں</button>
+            <div id="errorMsg" class="message error hidden" role="alert"></div>
+            <div id="instructions" class="hidden">
+                <h3>اگر آپ کو اجازت ڈائیلاگ نہیں دکھایا گیا:</h3>
+                <ol>
+                    <li>براؤزر کے ایڈریس بار میں آئیکن پر کلک کریں</li>
+                    <li>مائیکروفون کی اجازت کو "اجازت دیں" پر سیٹ کریں</li>
+                    <li>صفحہ کو ریفریش کریں اور دوبارہ کوشش کریں</li>
+                </ol>
             </div>
         </div>
 
-        <div id="translateStatus" class="status-text" role="status" aria-live="polite"></div>
-        <div id="translateError" class="message error hidden" role="alert"></div>
+        <div class="entry-points">
+            <!-- Record New -->
+            <section id="recordSection" class="container hidden" aria-labelledby="recordHeading">
+                <h2 id="recordHeading">🎙️ نئی ریکارڈنگ</h2>
+                <div id="successMsg" class="message success hidden">مائیکروفون کی اجازت مل گئی!</div>
 
-        <div id="debug" class="hidden"></div>
+                <canvas id="visualizer" width="600" height="60" aria-hidden="true"></canvas>
+
+                <div class="status-text">
+                    <span id="recordingStatus">ریکارڈنگ تیار ہے</span>
+                    <span id="recordingTime" class="recording-time hidden">00:00</span>
+                </div>
+
+                <div class="button-container">
+                    <button id="startBtn" type="button">
+                        <span class="recording-indicator"></span>
+                       🔴 ریکارڈنگ شروع کریں
+                    </button>
+                    <button id="pauseBtn" type="button" disabled>⏸ روکیں</button>
+                    <button id="stopBtn" type="button" disabled>
+                        <span class="recording-indicator"></span>
+                        ⏹ ریکارڈنگ ختم کریں
+                    </button>
+                    <button id="clearBtn" type="button">🗑️ صاف کریں</button>
+                </div>
+            </section>
+
+            <!-- Upload File -->
+            <section id="uploadSection" class="container" aria-labelledby="uploadHeading">
+                <h2 id="uploadHeading">📁 فائل اپ لوڈ کریں</h2>
+                <div id="dropZone" class="drop-zone" tabindex="0" role="button"
+                     aria-label="آڈیو فائل یہاں گھسیٹیں یا منتخب کرنے کے لیے کلک کریں">
+                    <p>فائل یہاں گھسیٹیں یا کلک کر کے منتخب کریں</p>
+                    <p class="drop-zone-hint">MP3, WAV, M4A, FLAC, WebM, OGG — زیادہ سے زیادہ <span id="maxUploadHint">100MB</span></p>
+                    <label for="audioFileInput" class="sr-only">آڈیو فائل منتخب کریں</label>
+                    <input type="file" id="audioFileInput" accept="audio/webm,audio/mp3,audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/aac,audio/flac,audio/x-flac,audio/x-m4a,audio/x-wav">
+                </div>
+            </section>
+        </div>
+
+        <!-- Shared workspace: language selection + results -->
+        <section id="workspace" class="container" aria-label="نتائج">
+            <div class="language-row">
+                <div class="language-field">
+                    <label for="sourceLanguage">ماخذ زبان (Source)</label>
+                    <select id="sourceLanguage"></select>
+                </div>
+                <span class="language-arrow" aria-hidden="true">→</span>
+                <div class="language-field">
+                    <label for="targetLanguage">ہدف زبان (Target)</label>
+                    <select id="targetLanguage"></select>
+                </div>
+            </div>
+
+            <div class="outputs-grid">
+                <div class="output-container">
+                    <h3 id="urduLabel">ماخذ متن (قابلِ ترمیم)</h3>
+                    <label for="urduText" class="sr-only">ماخذ متن، آپ اسے یہاں ٹائپ یا ترمیم کر سکتے ہیں</label>
+                    <textarea id="urduText" aria-labelledby="urduLabel" placeholder="یہاں متن ٹائپ کریں یا ریکارڈنگ/اپ لوڈ کا انتظار کریں..."></textarea>
+                    <div class="output-actions">
+                        <button id="copyUrduBtn" type="button">📋 کاپی کریں</button>
+                        <button id="saveAudioBtn" type="button" disabled>💾 آڈیو محفوظ کریں (MP3)</button>
+                        <button id="translateBtn" type="button" disabled>🌐 ترجمہ کریں</button>
+                    </div>
+                </div>
+
+                <div class="output-container">
+                    <h3 id="englishLabel">
+                        Translation
+                        <span id="staleNotice" class="stale-badge hidden">⚠ Outdated — translate again</span>
+                    </h3>
+                    <label for="englishText" class="sr-only">Translation output, read only</label>
+                    <textarea id="englishText" readonly aria-labelledby="englishLabel" placeholder="Translation will appear here"></textarea>
+                    <div class="output-actions">
+                        <button id="copyEnglishBtn" type="button" disabled>📋 Copy translation</button>
+                        <div class="export-group">
+                            <button id="exportTxtBtn" type="button" disabled>⬇ TXT</button>
+                            <button id="exportDocxBtn" type="button" disabled>⬇ DOCX</button>
+                            <button id="exportPdfBtn" type="button" disabled>⬇ PDF</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="translateStatus" class="status-text" role="status" aria-live="polite"></div>
+            <div id="translateError" class="message error hidden" role="alert"></div>
+            <div id="debug" class="hidden"></div>
+        </section>
     </div>
+
+    <!-- ==================== HISTORY TAB ==================== -->
+    <div id="tabHistory" class="tab-panel hidden" role="tabpanel" aria-labelledby="tabBtnHistory">
+        <section class="container">
+            <h2>🕘 ریکارڈنگ ہسٹری</h2>
+
+            <form id="historyFilters" class="history-filters">
+                <div class="filter-field">
+                    <label for="historyQuery">تلاش کریں</label>
+                    <input type="search" id="historyQuery" placeholder="فائل کا نام یا متن...">
+                </div>
+                <div class="filter-field">
+                    <label for="historySourceType">ذریعہ</label>
+                    <select id="historySourceType">
+                        <option value="">سب</option>
+                        <option value="recorded">ریکارڈ شدہ</option>
+                        <option value="uploaded">اپ لوڈ شدہ</option>
+                    </select>
+                </div>
+                <div class="filter-field">
+                    <label for="historyStatus">حالت</label>
+                    <select id="historyStatus">
+                        <option value="">سب</option>
+                        <option value="pending">زیر التوا</option>
+                        <option value="transcribing">ٹرانسکرائب ہو رہا ہے</option>
+                        <option value="transcribed">ٹرانسکرائب شدہ</option>
+                        <option value="translating">ترجمہ ہو رہا ہے</option>
+                        <option value="completed">مکمل</option>
+                        <option value="failed">ناکام</option>
+                    </select>
+                </div>
+                <div class="filter-field">
+                    <label for="historyDateFrom">تاریخ سے</label>
+                    <input type="date" id="historyDateFrom">
+                </div>
+                <div class="filter-field">
+                    <label for="historyDateTo">تاریخ تک</label>
+                    <input type="date" id="historyDateTo">
+                </div>
+                <button type="submit" id="historySearchBtn">تلاش کریں</button>
+            </form>
+
+            <div id="historyStatus2" class="status-text" role="status" aria-live="polite"></div>
+
+            <div class="scroller">
+            <table id="historyTable" class="history-table hidden">
+                <thead>
+                    <tr>
+                        <th>تاریخ</th>
+                        <th>فائل</th>
+                        <th>ذریعہ</th>
+                        <th>دورانیہ</th>
+                        <th>حالت</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="historyTableBody"></tbody>
+            </table>
+            </div>
+            <div id="historyEmpty" class="message hidden">کوئی ریکارڈنگ نہیں ملی۔</div>
+            <div class="button-container">
+                <button id="historyPrevBtn" type="button" disabled>◀ پچھلا</button>
+                <span id="historyPageInfo" class="status-text"></span>
+                <button id="historyNextBtn" type="button" disabled>اگلا ▶</button>
+            </div>
+        </section>
+
+        <!-- Detail panel -->
+        <section id="historyDetail" class="container hidden" aria-label="ریکارڈنگ کی تفصیل">
+            <button type="button" id="historyDetailClose" class="detail-close">✕ بند کریں</button>
+            <h2>تفصیل</h2>
+            <audio id="historyAudioPlayer" controls class="history-audio"></audio>
+            <div class="outputs-grid">
+                <div class="output-container">
+                    <h3>ماخذ متن</h3>
+                    <textarea id="historyTranscriptionText" readonly></textarea>
+                </div>
+                <div class="output-container">
+                    <h3>ترجمہ</h3>
+                    <textarea id="historyTranslationText" readonly></textarea>
+                </div>
+            </div>
+            <div class="button-container">
+                <button id="historyExportTxtBtn" type="button">⬇ TXT</button>
+                <button id="historyExportDocxBtn" type="button">⬇ DOCX</button>
+                <button id="historyExportPdfBtn" type="button">⬇ PDF</button>
+                <button id="historyDeleteBtn" type="button" class="danger">🗑️ حذف کریں</button>
+            </div>
+        </section>
+    </div>
+    </main>
+
+    <div id="toastContainer" aria-live="polite" aria-atomic="false"></div>
 
     <script src="app.js"></script>
 </body>

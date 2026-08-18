@@ -106,15 +106,15 @@ def count_tokens(text):
     return len(_tokenizer.encode(text, add_special_tokens=False))
 
 
-def translate_one(text):
-    """Translates a single bounded chunk of Urdu text (already within
-    MAX_INPUT_TOKENS_PER_CHUNK) and returns only the English translation."""
+def translate_one(text, source_language="ur", target_language="en"):
+    """Translates a single bounded chunk of text (already within
+    MAX_INPUT_TOKENS_PER_CHUNK) and returns only the translated text."""
     import torch
 
     if _model is None or _tokenizer is None:
         raise RuntimeError("Model not loaded")
 
-    messages = prompt_module.build_messages(text)
+    messages = prompt_module.build_messages(text, source_language, target_language)
     input_ids = _tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt").to(
         _model.device
     )

@@ -68,15 +68,26 @@ def is_ready():
     return _model is not None
 
 
-def transcribe_file(file_path):
-    """Runs transcription on a local file path. Forces WHISPER_LANGUAGE so
-    occasional English words in otherwise-Urdu speech are transcribed inline
-    rather than triggering language auto-switching mid-utterance."""
+def transcribe_file(file_path, language_override=None):
+    """Runs transcription on a local file path.
+
+    By default (and for Urdu, the primary use case) the language is forced
+    rather than auto-detected, so occasional English words in otherwise-Urdu
+    speech are transcribed inline rather than triggering language
+    auto-switching mid-utterance. `language_override` lets a caller request
+    a different fixed language, or explicit "auto" to let faster-whisper
+    detect it (useful for genuinely multilingual/unknown-source-language input).
+    """
     model = load_model()
+
+    if language_override == "auto":
+        language = None
+    else:
+        language = language_override or config.WHISPER_LANGUAGE
 
     segments, info = model.transcribe(
         file_path,
-        language=config.WHISPER_LANGUAGE,
+        language=language,
         beam_size=config.WHISPER_BEAM_SIZE,
         vad_filter=config.WHISPER_VAD_FILTER,
     )

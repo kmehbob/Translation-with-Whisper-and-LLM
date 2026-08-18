@@ -20,6 +20,29 @@ after this revision:
 Secure API authentication (bearer token, §1) and the self-hosted/private
 model requirement were already met and are unchanged.
 
+### Platform expansion (recording history, multi-language, exports)
+
+A follow-up requirements document asked for persistent recording history,
+drag-and-drop upload, pause/resume + a live level meter while recording,
+arbitrary source/target language pairs, TXT/DOCX/PDF export, and
+"Save to device" - plus GPU hosting on Google Cloud. Two of those points
+directly touched decisions already made above, so they were confirmed
+explicitly rather than assumed:
+
+- **Persistent history is now a real, deliberate feature**, replacing the
+  "delete everything immediately" stance from earlier in this document.
+  Audio (normalized to MP3), transcripts, and translations are now kept in a
+  SQLite database + a permanent audio directory until manually deleted or
+  `RECORDINGS_RETENTION_DAYS` expires them. This is a genuine privacy-policy
+  reversal, done on request - see the rewritten §3 for exactly what is
+  stored, for how long, and how to turn it back off.
+- **"Google Cloud GPU instances" means hosting, not an AI API.** The
+  self-hosted stack (faster-whisper + Qwen2.5-Instruct, unchanged) runs on
+  Google Cloud Compute Engine GPU VMs (A100/T4/L4) instead of on-prem
+  hardware - it does **not** mean calling Google's Speech-to-Text/Translate
+  APIs, which would reopen the exact "no external AI provider" gap closed
+  above. See §5 for GCP-specific deployment notes.
+
 ## 1. Architecture
 
 ```
@@ -31,6 +54,8 @@ Reverse proxy (deploy/Caddyfile, optional: docker compose --profile proxy)
    v
 Express gateway (serve.js)     <- rate-limited, request-ID'd,
    |                              structured JSON logs, graceful shutdown
+   |--- SQLite (data/app.db) + MP3 store (recordings/) - recording history
+   |
    |  MUTUAL TLS (client cert) + Bearer INTERNAL_SERVICE_TOKEN, timeouts,
    |  concurrency caps, cancellation on client disconnect
    |
@@ -38,6 +63,11 @@ Express gateway (serve.js)     <- rate-limited, request-ID'd,
    |
    +--> Translation service   (Python/FastAPI + transformers/Qwen2.5-Instruct) [internal network only, mTLS]
 ```
+
+The recording history database and audio store live entirely inside the
+gateway process/container (`lib/db.js`, `lib/recordingsRepo.js`,
+`lib/audioStorage.js`) - neither AI service has or needs its own storage;
+they stay stateless request/response processors exactly as before.
 
 The Node gateway remains the single public entry point (unchanged pattern
 from the existing app). The two AI services are separate Python processes so
@@ -179,7 +209,107 @@ wrapped in fixed delimiters, any literal occurrence of those delimiters
 model to treat the delimited block as translatable data only, never as
 instructions - see `tests/test_prompt.py` for the adversarial test cases.
 
-## 3. Privacy and data lifecycle
+### 2.4 Multi-language support
+
+Both services now accept an explicit language (pair), defaulting to
+Urdu→English when nothing is specified - this is additive, not a breaking
+change to the original Urdu-only behavior:
+
+- **Transcription** (`POST /api/v1/transcribe`): an optional `language` field
+  (ISO 639-1 code, e.g. `en`, `ar`, `hi`, or `auto`) overrides
+  `WHISPER_LANGUAGE` for that request. `auto` lets faster-whisper detect the
+  spoken language instead of forcing one - useful when the source language
+  genuinely isn't known ahead of time. Forcing a language (the default) is
+  still recommended for Urdu specifically, since it keeps occasional
+  English words inline instead of triggering a language switch mid-utterance.
+- **Translation** (`POST /api/v1/translate`): `sourceLanguage`/`targetLanguage`
+  fields (default `ur`/`en`) are named in the system prompt itself
+  (`ai-services/translation/prompt.py:build_system_prompt`) - e.g. "You are a
+  professional French-to-German translator...". Translation quality for
+  language pairs other than Urdu→English depends on Qwen2.5's own coverage
+  of those languages; it was not re-evaluated per-pair here.
+- The frontend (`public/app.js`) exposes both as dropdowns (`LANGUAGES`
+  list) above the transcription/translation panels, and passes the selected
+  values straight through on every request.
+
+## 3. Recording history, exports & data retention
+
+**This is a deliberate privacy-policy change from earlier in this
+document**, made at the user's explicit request (see "Platform expansion"
+above) - audio and text are no longer deleted immediately.
+
+### 3.1 What is stored, and where
+
+- **`data/app.db`** (SQLite, via `better-sqlite3`) - one row per
+  audio-originated item (recorded or uploaded), in the `recordings` table:
+  source type, original filename, stored filename, MIME type, file size,
+  duration, source/target language, transcription text, translation text,
+  status (`pending → transcribing → transcribed → translating → completed`,
+  or `failed`), error message, and timestamps. Schema + migrations live in
+  `lib/db.js`.
+- **`recordings/`** - the permanent audio store. Every recording (recorded
+  *or* uploaded, whatever format it arrived in - MP3/WAV/M4A/FLAC/WebM/OGG)
+  is transcoded to MP3 via `lib/audioStorage.js` (bundled `ffmpeg-static`/
+  `ffprobe-static`, no system ffmpeg install required) before being written
+  here, so "recordings are saved in MP3 format" holds regardless of source format.
+- **What is still transient:** the `uploads/` directory is only a staging
+  area multer writes the raw multipart upload to; it is deleted in a
+  `finally` block (`routes/transcribe.js`) immediately after conversion,
+  success or failure, exactly as audio was handled before this change.
+- **What is *not* persisted:** a translation of typed-only text (no
+  `recordingId`, i.e. the user typed Urdu directly rather than
+  recording/uploading) is not written to history - only audio-originated
+  items become "recordings." This keeps the history dashboard scoped to
+  what its name implies.
+
+### 3.2 Retention and deletion
+
+- `RECORDINGS_RETENTION_DAYS` (default `0` = keep forever) - when set,
+  `serve.js` prunes any recording older than N days once at startup and
+  once every 24h thereafter (`pruneExpiredRecordings`), deleting both the
+  DB row and its MP3 file.
+- Users can delete any recording immediately via the History tab (or
+  `DELETE /api/v1/recordings/:id`), which removes the DB row and the audio
+  file together, synchronously.
+- No audio or text is used to train, fine-tune, or otherwise improve any
+  model - the models are frozen, pre-trained, open-weight checkpoints run
+  purely for inference.
+
+### 3.3 Exports
+
+`GET /api/v1/recordings/:id/export?format=txt|docx|pdf` (`lib/exporters.js`)
+returns the transcription + translation as a download:
+
+- **TXT/DOCX** are straightforward. DOCX marks Urdu/Arabic-script paragraphs
+  right-to-left (`bidirectional: true`) and lets Word/LibreOffice's own
+  text shaping handle the rest.
+- **PDF** does not use a Nastaliq-style Urdu font: an actual rendering test
+  (visually verified, not just "it didn't crash") found reproducible
+  crashes in `pdfkit`'s/`fontkit`'s Arabic shaping on ordinary Urdu letter
+  combinations with Noto Nastaliq Urdu. **Noto Naskh Arabic** (a simpler,
+  non-ligature-heavy style, full glyph coverage, embedded from
+  `assets/fonts/`) is used instead, with a hand-rolled script-run splitter
+  for lines that mix Urdu/Arabic-script text with Latin words or digits
+  (PDFKit doesn't shape or bidi-order across a script boundary on its own).
+  See the code comments in `lib/exporters.js` for the specifics.
+
+### 3.4 Logging (unchanged)
+
+Logs are structured JSON containing only operational metadata (durations,
+byte counts, status codes, request IDs). `lib/logger.js` (Node) and
+`logging_utils.py` (Python) redact known-sensitive keys and truncate long
+free-form strings by construction, so raw text, audio bytes, and tokens are
+never written to logs - see `tests/logger.test.js` and
+`tests/privacyLogging.test.js`. This is unchanged by the retention-policy
+update above: *logs* still never contain content; the *database* now
+deliberately does.
+
+**No external AI provider is ever called for any feature.** Transcription
+and translation both run on infrastructure you control, over mutual TLS
+internally (§1.1); nothing in this application calls OpenAI, Anthropic,
+Google, or any other third-party inference API - "Google Cloud" in this
+project means the VM the containers run on, never an API call (see
+"Platform expansion" above).
 
 - Uploaded audio is written to a temp file, transcribed, and deleted
   immediately in a `finally` block - both at the gateway (`routes/transcribe.js`)
@@ -207,7 +337,10 @@ instructions - see `tests/test_prompt.py` for the adversarial test cases.
 See `.env.example` for the full list with defaults and inline explanations.
 Copy it to `.env` and fill in `INTERNAL_SERVICE_TOKEN` at minimum; for
 anything beyond local development, also generate and enable the mTLS certs
-(§1.1, §5).
+(§1.1, §5). New in this revision: `DB_PATH`, `RECORDINGS_DIR`,
+`RECORDINGS_RETENTION_DAYS`, `DEFAULT_SOURCE_LANGUAGE`,
+`DEFAULT_TARGET_LANGUAGE` (§3, §2.4) - all optional, with the defaults shown
+being what Docker Compose's persistent volumes already point at.
 
 ## 5. Deployment
 
@@ -266,6 +399,41 @@ Caddy (`deploy/Caddyfile`) automatically obtains and renews a Let's Encrypt
 certificate for `PUBLIC_DOMAIN` and forwards to the gateway. Left unset, it
 defaults to `localhost` and serves its own locally-trusted certificate -
 usable for internal testing, not a real public deployment.
+
+### Hosting on Google Cloud
+
+Nothing above changes - this is the same Docker Compose stack, just running
+on a Google Cloud Compute Engine GPU VM instead of on-prem/other hardware.
+"Google Cloud" here means compute, not an AI API - Google's own
+Speech-to-Text/Translate services are never called (§0, §3.4).
+
+1. **Pick a GPU VM shape** matching the VRAM tier you need (§2.1/§2.2):
+   an `n1-standard-8` + **T4** (16GB) for the low/medium tier default
+   (`Qwen2.5-7B-Instruct` int4 + `medium` Whisper), or an `a2-highgpu-1g`
+   (**A100**, 40/80GB) for the high tier. **L4** GPUs (`g2-standard-*`) are a
+   cost-effective mid-tier option with good int4/int8 inference throughput.
+2. **Use a Deep Learning VM image or install the NVIDIA driver + Docker +
+   NVIDIA Container Toolkit yourself** - GCP's Deep Learning VM images come
+   with the driver preinstalled, which avoids a common source of driver/CUDA
+   mismatch. Either way, the prerequisites are identical to any other GPU
+   host (§ above).
+3. **Persistent disks for the named volumes**: `whisper-model-cache`,
+   `translation-model-cache`, and the new `gateway-data`/`gateway-recordings`
+   volumes (§3) should live on a persistent disk (not the VM's local SSD),
+   so model weights and recording history survive a VM restart/recreation.
+   Docker's default volume driver already stores these under
+   `/var/lib/docker/volumes` on whatever disk that is - just make sure that
+   disk is the persistent one, not an ephemeral local SSD.
+4. **Firewall**: only open 443 (and 80 for Let's Encrypt's HTTP-01
+   challenge) on the VM's firewall rules - never open 3000, 8001, 8002, or
+   443/80 wouldn't be needed at all if you terminate TLS with your own load
+   balancer instead of the bundled Caddy profile.
+5. **Static/reserved external IP + a DNS A record** pointing at it, then set
+   `PUBLIC_DOMAIN` to that domain as in the generic instructions above.
+
+This was not deployed to an actual GCP project as part of this change (no
+GCP credentials/project available in this environment) - the steps above
+are configuration guidance to follow, not a verified deployment.
 
 ### Rollback procedure
 
@@ -346,6 +514,29 @@ instrumentation work.
   against abuse of that leniency are the bearer-token auth, mTLS, the
   internal-only network placement, the size cap, and faster-whisper's own
   decode failure on non-audio input (returned as a generic 500, never a crash).
+- **The recording history has no per-user ownership or access control** -
+  `REQUIRE_CLIENT_API_KEY` (if enabled) gates access to the API as a whole,
+  same as transcribe/translate, but does not scope *which* recordings a
+  given caller can see/export/delete. Anyone with API access can see and
+  delete anyone else's history. Fine for a single-tenant/internal
+  deployment; a real multi-user product would need actual authentication
+  and per-recording ownership before shipping this widely.
+- `better-sqlite3`/`ffmpeg-static`/`ffprobe-static` were verified to work
+  correctly on this Windows dev machine, and their bundled prebuilt
+  binaries were confirmed (by reading their own platform-detection code) to
+  include Alpine/musl-compatible builds - but an actual `docker build` of
+  the gateway image was not run in this environment (no local Docker daemon
+  available at the time), so the Alpine container path is unverified in
+  practice. Run `docker compose build gateway` and confirm it starts
+  cleanly before relying on this in production.
+- `RECORDINGS_RETENTION_DAYS` pruning is unit-tested for its no-op paths
+  (0/disabled, nothing old enough to prune) but not against genuinely
+  aged real data, since that requires either waiting real days or manually
+  backdating rows - do a manual check after enabling it for the first time.
+- The PDF export's Urdu/Arabic rendering uses Noto Naskh Arabic, not the
+  Nastaliq style most Urdu print material traditionally uses - a readability
+  tradeoff made after Nastaliq reproducibly crashed the PDF renderer (§3.3),
+  not a design preference.
 
 ## 8. Monitoring recommendations
 
@@ -367,6 +558,9 @@ instrumentation work.
   automated renewal for these (§7).
 - If using the reverse-proxy profile, monitor Caddy's own logs for
   certificate-renewal failures.
+- **Disk usage on the `gateway-data`/`gateway-recordings` volumes** - these
+  now grow without bound unless `RECORDINGS_RETENTION_DAYS` is set (§3.2).
+  Alert well before the volume fills up.
 
 ## 9. QA checklist (human review)
 
@@ -386,6 +580,14 @@ instrumentation work.
 - [ ] With Docker Compose up, capture gateway↔AI-service traffic (e.g. `tcpdump` on the `internal` network) and confirm it is TLS, not plaintext HTTP.
 - [ ] Confirm a request to an AI service without a valid client certificate is rejected (mTLS actually enforced, not just configured).
 - [ ] With the reverse-proxy profile running against a real `PUBLIC_DOMAIN`, confirm plain `http://` requests are not served in plaintext and the certificate is trusted by a normal browser.
+- [ ] Drag an audio file onto the upload zone -> transcription starts the same way as picking it via the file browser.
+- [ ] Pause a recording, resume it, then stop -> the transcribed text reflects both segments (the pause gap is excluded, not garbled).
+- [ ] Pick a non-default source/target language pair (e.g. French -> German) -> transcription and translation both use it, and the system prompt visibly names that pair (check gateway/service logs' `source_language`/`target_language` fields).
+- [ ] Complete a transcription+translation, then export it as TXT, DOCX, and PDF -> each downloads, opens, and contains the correct text (PDF: confirm Urdu text is legible and not boxes/garbled - see §3.3 on the font choice).
+- [ ] Click "Save audio (MP3)" -> downloads a real, playable MP3 of the recording.
+- [ ] Open the History tab -> the just-created recording appears with correct metadata and status; search/filter by filename, source type, status, and date range each narrow the results correctly.
+- [ ] Open a history item's detail view -> audio plays back, transcription/translation are shown, and delete actually removes it (confirm it disappears from the list and a re-fetch 404s).
+- [ ] Set `RECORDINGS_RETENTION_DAYS=1`, manually backdate a test row's `created_at` in the DB, restart the gateway -> the row and its MP3 file are both gone after the prune runs.
 
 ### Sample Urdu -> English evaluation set
 
@@ -407,41 +609,83 @@ specifically) that the model translated the sentence rather than obeying it.
 
 ## 10. Summary of changed/added files
 
-**Modified:**
-- `serve.js` - security headers, CORS, request IDs, structured logging, new
-  route mounting, graceful shutdown; the `/speak` (OpenAI TTS) route, its
-  cache directory, and `OPENAI_API_KEY` have been **removed entirely** -
-  the app now has zero external AI dependencies. `/health` preserved as-is.
-- `public/index.html` - editable Urdu textarea, file upload, translate
-  button, English output, independent copy buttons, accessibility markup.
-- `package.json` - added `helmet`, `cors` (deps) and `jest`, `supertest`
-  (devDeps); removed unused `google-tts-api`/`mp3-duration`; wired
-  `test`/`test:integration` scripts.
-- `docker-compose.yml` - mTLS certs/env wiring for all three services,
-  loopback-only gateway port publish, optional `reverse-proxy` (Caddy)
-  service behind a `proxy` profile.
-- `ai-services/*/Dockerfile` - conditional TLS/mTLS uvicorn startup,
-  mTLS-aware healthcheck via `healthcheck.sh`.
-- `.env.example` - added all TLS/mTLS and reverse-proxy env vars.
+**Modified (this revision - history/multi-language/exports):**
+- `serve.js` - mounts `routes/recordings.js`; starts/schedules
+  `pruneExpiredRecordings` (§3.2).
+- `routes/transcribe.js` - converts every upload to MP3 (`lib/audioStorage.js`),
+  creates/updates a `recordings` row instead of deleting the audio, accepts
+  `source` (`recorded`/`uploaded`) and `language` fields, adds FLAC/WAV
+  MIME variants to the allow-list.
+- `routes/translate.js` - accepts `sourceLanguage`/`targetLanguage`/
+  `recordingId`; updates the linked recording's row on success/failure.
+- `lib/config.js` - adds `dbPath`, `recordingsDir`, `recordingsRetentionDays`,
+  `defaultSourceLanguage`, `defaultTargetLanguage`.
+- `ai-services/transcription/app.py`/`model_backend.py` - optional
+  per-request `language` override (§2.4).
+- `ai-services/translation/app.py`/`model_backend.py`/`prompt.py` - dynamic
+  `sourceLanguage`/`targetLanguage` support; system prompt now names the
+  actual requested language pair instead of hardcoding Urdu/English.
+- `public/index.html`/`app.js`/`style.css` - full rework: Create/History
+  tabs, drag-and-drop upload zone alongside the file picker, pause/resume
+  recording, a live canvas level meter, source/target language dropdowns,
+  "Save audio (MP3)" + TXT/DOCX/PDF export buttons, a History dashboard
+  (search/filter/paginate/detail/playback/delete), and a small toast
+  notification system.
+- `package.json` - adds `better-sqlite3`, `ffmpeg-static`, `ffprobe-static`,
+  `fluent-ffmpeg`, `docx`, `pdfkit`.
+- `Dockerfile` (gateway) - copies `assets/` (embedded PDF font), creates
+  `data/`/`recordings/` directories.
+- `docker-compose.yml` - adds `gateway-data`/`gateway-recordings`/
+  `gateway-uploads` persistent volumes on the gateway service.
+- `.env.example` - adds `DB_PATH`, `RECORDINGS_DIR`,
+  `RECORDINGS_RETENTION_DAYS`, `DEFAULT_SOURCE_LANGUAGE`,
+  `DEFAULT_TARGET_LANGUAGE`.
+- `.gitignore` - adds `data/` and `recordings/*` (real user data, never committed).
 
-**Added (Node gateway):**
+**Modified (prior revision - mTLS/OpenAI removal, unchanged since):**
+- security headers, CORS, request IDs, structured logging, graceful
+  shutdown; the `/speak` (OpenAI TTS) route, its cache directory, and
+  `OPENAI_API_KEY` were removed entirely; mTLS wiring throughout.
+
+**Added (Node gateway, this revision):**
+- `lib/db.js` - SQLite connection + schema (`recordings` table).
+- `lib/recordingsRepo.js` - create/update/get/list (search+filter+paginate)/
+  remove/pruneExpired.
+- `lib/audioStorage.js` - ffmpeg-based MP3 conversion + duration probing +
+  permanent-file management.
+- `lib/exporters.js` - TXT/DOCX/PDF generation, including the script-run
+  RTL/Latin/digit splitter used for the PDF path (§3.3).
+- `routes/recordings.js` - list/get/audio/export/delete endpoints.
+- `assets/fonts/NotoNaskhArabic-Regular.ttf` - embedded PDF font (OFL-licensed).
+- `tests/audioStorage.test.js`, `tests/recordingsRepo.test.js`,
+  `tests/recordings.test.js`, `tests/exporters.test.js`,
+  `tests/serviceClientTls.test.js` (mTLS, prior revision).
+
+**Added (Node gateway, prior revisions, unchanged):**
 - `lib/config.js`, `lib/logger.js`, `lib/requestId.js`, `lib/serviceClient.js`
-  (now includes mTLS `https.Agent` wiring), `lib/concurrencyGuard.js`, `lib/rateLimiters.js`
+  (mTLS `https.Agent`), `lib/concurrencyGuard.js`, `lib/rateLimiters.js`
 - `middleware/auth.js`, `middleware/errorHandler.js`
 - `routes/transcribe.js`, `routes/translate.js`, `routes/health.js`
-- `public/style.css`, `public/app.js` (extracted from the previous inline HTML)
+- `public/style.css`, `public/app.js` (extracted from the original inline HTML)
 - `tests/*.test.js`, `tests/integration/*.integration.test.js`
 
 **Added (AI services):**
 - `ai-services/transcription/` - `app.py`, `model_backend.py`, `config.py`
-  (now incl. TLS settings), `concurrency.py`, `logging_utils.py`,
-  `healthcheck.sh`, `requirements*.txt`, `Dockerfile`, `tests/`
-- `ai-services/translation/` - `app.py`, `model_backend.py`, `prompt.py`,
-  `chunker.py`, `config.py` (now incl. TLS settings), `concurrency.py`,
-  `logging_utils.py`, `healthcheck.sh`, `requirements*.txt`, `Dockerfile`, `tests/`
+  (TLS + language settings), `concurrency.py`, `logging_utils.py`,
+  `healthcheck.sh`, `requirements*.txt`, `Dockerfile`, `tests/` (incl.
+  `test_model_backend.py`, new this revision).
+- `ai-services/translation/` - `app.py`, `model_backend.py`, `prompt.py`
+  (now builds a dynamic language-pair prompt), `chunker.py`, `config.py`
+  (TLS settings), `concurrency.py`, `logging_utils.py`, `healthcheck.sh`,
+  `requirements*.txt`, `Dockerfile`, `tests/`.
 
 **Added (deployment/docs/security):**
 - `Dockerfile` (gateway), `docker-compose.yml`, `.env.example`
 - `scripts/generate-internal-certs.sh` - internal CA + mTLS cert generation
 - `deploy/Caddyfile` - optional public HTTPS reverse proxy
 - `docs/AI_FEATURE.md` (this file)
+
+**Current test counts** (all run and passing in this environment, unlike
+GPU inference - see §7): **79 Node tests** (`npm test`), **55 Python tests**
+(21 transcription + 34 translation, 2 more skipped by design pending real
+GPU access).

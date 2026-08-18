@@ -4,6 +4,11 @@ uploads/*
 !uploads/.gitkeep
 *.log
 
+# Persistent recording history - real user audio/DB data, never committed
+data/
+recordings/*
+!recordings/.gitkeep
+
 # Generated internal mTLS certs/keys - never commit real key material
 certs/
 

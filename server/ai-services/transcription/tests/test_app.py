@@ -13,7 +13,7 @@ def client(monkeypatch):
     monkeypatch.setattr(
         model_backend,
         "transcribe_file",
-        lambda path: {"text": "یہ ایک ٹیسٹ ہے", "language": "ur", "duration_seconds": 1.2},
+        lambda path, language_override=None: {"text": "یہ ایک ٹیسٹ ہے", "language": "ur", "duration_seconds": 1.2},
     )
     monkeypatch.setattr(config, "INTERNAL_SERVICE_TOKEN", "")
     with TestClient(app_module.app) as c:
@@ -110,11 +110,44 @@ def test_transcribe_busy_returns_503(client, monkeypatch):
     assert response.status_code == 503
 
 
+def test_transcribe_passes_through_a_language_override(client, monkeypatch):
+    received = {}
+
+    def spying_transcribe(path, language_override=None):
+        received["language_override"] = language_override
+        return {"text": "hello", "language": "en", "duration_seconds": 1.0}
+
+    monkeypatch.setattr(model_backend, "transcribe_file", spying_transcribe)
+    response = client.post(
+        "/v1/transcribe",
+        files={"file": ("audio.webm", b"fake-audio-bytes", "audio/webm")},
+        data={"language": "en"},
+    )
+    assert response.status_code == 200
+    assert received["language_override"] == "en"
+    assert response.json()["language"] == "en"
+
+
+def test_transcribe_omits_language_override_when_not_provided(client, monkeypatch):
+    received = {}
+
+    def spying_transcribe(path, language_override=None):
+        received["language_override"] = language_override
+        return {"text": "ok", "language": "ur", "duration_seconds": 1.0}
+
+    monkeypatch.setattr(model_backend, "transcribe_file", spying_transcribe)
+    response = client.post(
+        "/v1/transcribe",
+        files={"file": ("audio.webm", b"fake-audio-bytes", "audio/webm")},
+    )
+    assert response.status_code == 200
+    assert received["language_override"] is None
+
+
 def test_transcribe_deletes_temp_file(client, monkeypatch):
     created_paths = []
-    original_transcribe = model_backend.transcribe_file
 
-    def spying_transcribe(path):
+    def spying_transcribe(path, language_override=None):
         created_paths.append(path)
         return {"text": "ok", "language": "ur", "duration_seconds": 0.5}
 
@@ -132,7 +165,7 @@ def test_transcribe_deletes_temp_file(client, monkeypatch):
 
 
 def test_transcribe_returns_500_on_backend_failure(client, monkeypatch):
-    def failing_transcribe(path):
+    def failing_transcribe(path, language_override=None):
         raise RuntimeError("boom")
 
     monkeypatch.setattr(model_backend, "transcribe_file", failing_transcribe)

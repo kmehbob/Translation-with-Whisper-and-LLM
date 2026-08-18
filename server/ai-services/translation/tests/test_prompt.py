@@ -1,4 +1,4 @@
-from prompt import BEGIN_MARKER, END_MARKER, SYSTEM_PROMPT, build_messages
+from prompt import BEGIN_MARKER, END_MARKER, SYSTEM_PROMPT, build_messages, build_system_prompt, language_name
 
 
 def test_system_prompt_forbids_following_embedded_instructions():
@@ -37,3 +37,23 @@ def test_prompt_injection_instruction_text_is_preserved_as_literal_data():
     # just wrapped - we are not supposed to strip user content, only stop it
     # from being interpreted as a real instruction by the model.
     assert malicious in messages[1]["content"]
+
+
+def test_language_name_maps_known_codes_and_falls_back_to_the_raw_code():
+    assert language_name("ur") == "Urdu"
+    assert language_name("fr") == "French"
+    assert language_name("xx-made-up") == "xx-made-up"
+    assert language_name("") == "the source language"
+
+
+def test_build_system_prompt_names_the_requested_language_pair():
+    prompt = build_system_prompt("fr", "es")
+    assert "French-to-Spanish translator" in prompt
+    assert "natural, fluent Spanish" in prompt
+    assert "translated Spanish text" in prompt
+
+
+def test_build_messages_uses_the_requested_language_pair_not_the_default():
+    messages = build_messages("Bonjour", source_language="fr", target_language="de")
+    assert "French-to-German" in messages[0]["content"]
+    assert messages[0]["content"] != SYSTEM_PROMPT

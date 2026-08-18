@@ -6,7 +6,7 @@ import config
 import model_backend
 
 
-def fake_translate_one(text):
+def fake_translate_one(text, source_language="ur", target_language="en"):
     return f"[EN] {text}"
 
 
@@ -91,7 +91,7 @@ def test_translate_busy_returns_503(client, monkeypatch):
 
 
 def test_translate_backend_failure_returns_500_without_leaking_details(client, monkeypatch):
-    def failing_translate(text):
+    def failing_translate(text, source_language="ur", target_language="en"):
         raise RuntimeError("cuda out of memory at /internal/path/model.py:123")
 
     monkeypatch.setattr(model_backend, "translate_one", failing_translate)
@@ -113,7 +113,7 @@ def test_translate_preserves_paragraph_breaks_via_grouped_batch(client):
 def test_translate_handles_long_paragraph_via_sentence_split(client, monkeypatch):
     calls = []
 
-    def counting_translate(text):
+    def counting_translate(text, source_language="ur", target_language="en"):
         calls.append(text)
         return f"[EN] {text}"
 
@@ -132,6 +132,39 @@ def test_translate_prompt_injection_shaped_input_is_handled_like_normal_text(cli
     response = client.post("/v1/translate", json={"text": malicious})
     assert response.status_code == 200
     assert response.json()["translation"].startswith("[EN]")
+
+
+def test_translate_passes_through_a_custom_language_pair(client, monkeypatch):
+    received = {}
+
+    def spying_translate(text, source_language="ur", target_language="en"):
+        received["source_language"] = source_language
+        received["target_language"] = target_language
+        return f"[{target_language}] {text}"
+
+    monkeypatch.setattr(model_backend, "translate_one", spying_translate)
+    response = client.post(
+        "/v1/translate",
+        json={"text": "Bonjour", "sourceLanguage": "fr", "targetLanguage": "es"},
+    )
+    assert response.status_code == 200
+    assert received["source_language"] == "fr"
+    assert received["target_language"] == "es"
+
+
+def test_translate_defaults_to_urdu_to_english_when_languages_omitted(client, monkeypatch):
+    received = {}
+
+    def spying_translate(text, source_language="ur", target_language="en"):
+        received["source_language"] = source_language
+        received["target_language"] = target_language
+        return "ok"
+
+    monkeypatch.setattr(model_backend, "translate_one", spying_translate)
+    response = client.post("/v1/translate", json={"text": "سلام"})
+    assert response.status_code == 200
+    assert received["source_language"] == "ur"
+    assert received["target_language"] == "en"
 
 
 def test_context_budget_check_warns_when_misconfigured(monkeypatch):

@@ -23,7 +23,7 @@ describe("POST /api/v1/translate", () => {
         expect(mockRequest).toHaveBeenCalledTimes(1);
         const call = mockRequest.mock.calls[0][0];
         expect(call.url).toBe("/v1/translate");
-        expect(call.data).toEqual({ text: "آپ کیسے ہیں؟" });
+        expect(call.data).toEqual({ text: "آپ کیسے ہیں؟", sourceLanguage: "ur", targetLanguage: "en" });
     });
 
     test("translates formal Urdu text", async () => {
@@ -95,7 +95,11 @@ describe("POST /api/v1/translate", () => {
 
         expect(res.status).toBe(200);
         // The gateway must forward it unmodified as data, not interpret it.
-        expect(mockRequest.mock.calls[0][0].data).toEqual({ text: injection });
+        expect(mockRequest.mock.calls[0][0].data).toEqual({
+            text: injection,
+            sourceLanguage: "ur",
+            targetLanguage: "en",
+        });
     });
 
     test("returns a safe 504 when the translation service times out", async () => {

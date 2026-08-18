@@ -32,13 +32,19 @@ services:
       INTERNAL_TLS_CA_FILE: /certs/ca.crt
     volumes:
       - ./certs:/certs:ro
+      # Persistent recording history (SQLite DB + permanent MP3 audio) and
+      # the transient multipart-upload staging directory - see
+      # docs/AI_FEATURE.md for the data-retention policy this implies.
+      - gateway-data:/app/data
+      - gateway-recordings:/app/recordings
+      - gateway-uploads:/app/uploads
     depends_on:
       - transcription
       - translation
     networks:
       - internal
     restart: unless-stopped
-    read_only: false # multer writes uploaded audio to ./uploads (deleted per-request)
+    read_only: false # writes to ./uploads (transient), ./data and ./recordings (persistent)
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', r => process.exit(r.statusCode===200?0:1)).on('error', () => process.exit(1))"]
       interval: 30s
@@ -164,3 +170,6 @@ volumes:
   translation-model-cache:
   caddy-data:
   caddy-config:
+  gateway-data:
+  gateway-recordings:
+  gateway-uploads:

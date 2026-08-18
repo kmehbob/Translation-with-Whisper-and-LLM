@@ -68,6 +68,17 @@ const config = {
     rateLimitGeneralMax: int(process.env.RATE_LIMIT_GENERAL_MAX, 60),
 
     logLevel: process.env.LOG_LEVEL || "info",
+
+    // Recording history (persistent storage - see docs/AI_FEATURE.md for the
+    // data-retention policy this implies). SQLite file + a permanent audio
+    // directory, both expected to live on a mounted volume in production.
+    dbPath: process.env.DB_PATH || "",
+    recordingsDir: process.env.RECORDINGS_DIR || "",
+    recordingsRetentionDays: int(process.env.RECORDINGS_RETENTION_DAYS, 0), // 0 = keep forever
+
+    // Default language pair when a request doesn't specify one.
+    defaultSourceLanguage: process.env.DEFAULT_SOURCE_LANGUAGE || "ur",
+    defaultTargetLanguage: process.env.DEFAULT_TARGET_LANGUAGE || "en",
 };
 
 module.exports = config;

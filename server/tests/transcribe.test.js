@@ -1,17 +1,34 @@
 const fs = require("fs");
+const path = require("path");
 
 jest.mock("axios");
+// Audio conversion (real ffmpeg) is exercised for real in
+// tests/audioStorage.test.js; route tests mock it so they exercise routing/
+// persistence/error-handling logic without needing real audio bytes.
+jest.mock("../lib/audioStorage");
 
 const axios = require("axios");
 const request = require("supertest");
+const audioStorage = require("../lib/audioStorage");
 
 const mockRequest = jest.fn();
 axios.create.mockReturnValue({ request: mockRequest, get: jest.fn() });
 
 const app = require("../serve.js");
 
+let convertedCounter = 0;
+
 beforeEach(() => {
     mockRequest.mockReset();
+    convertedCounter += 1;
+    audioStorage.convertToMp3.mockReset().mockImplementation(async () => ({
+        storedFilename: `stored-${convertedCounter}.mp3`,
+        storedPath: path.join(__dirname, "..", "recordings", `stored-${convertedCounter}.mp3`),
+        fileSizeBytes: 1234,
+    }));
+    audioStorage.probeDurationSeconds.mockReset().mockResolvedValue(3.5);
+    audioStorage.deleteStoredFile.mockReset();
+    audioStorage.storedFilePath.mockReset().mockImplementation((name) => path.join(__dirname, "..", "recordings", name));
 });
 
 describe("POST /api/v1/transcribe", () => {

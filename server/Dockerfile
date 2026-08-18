@@ -12,8 +12,9 @@ COPY lib ./lib
 COPY middleware ./middleware
 COPY routes ./routes
 COPY public ./public
+COPY assets ./assets
 
-RUN mkdir -p uploads \
+RUN mkdir -p uploads data recordings \
     && addgroup -S appgroup && adduser -S appuser -G appgroup \
     && chown -R appuser:appgroup /app
 

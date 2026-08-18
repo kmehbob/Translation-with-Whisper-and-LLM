@@ -418,6 +418,7 @@
 
       <li class="group-label">Operations</li>
       <li><a href="#config">Configuration reference</a></li>
+      <li><a href="#history">Recording history, languages &amp; exports</a></li>
       <li><a href="#privacy">Privacy &amp; data lifecycle</a></li>
       <li><a href="#testing">Testing</a></li>
       <li><a href="#files">File structure</a></li>
@@ -449,6 +450,16 @@
         and the design-constraints table just below for the <code>/speak</code>/OpenAI removal. Production performance
         and full end-to-end QA still require the real GPU server, which remains outside this environment's access —
         reported honestly as pending in <a href="#appendix">§12</a>, not claimed as done.</p>
+      </div>
+      <div class="callout" style="margin-top:8px">
+        <p><strong>Platform expansion:</strong> a broader "Audio Transcription &amp; Translation Platform" requirements
+        document added record+upload with drag-and-drop, pause/resume with a live level meter, multi-language
+        transcription/translation, MP3/TXT/DOCX/PDF export, a permanent recording history, and Google Cloud as a
+        hosting target. Two of those items directly reversed prior decisions in this document, and were confirmed
+        explicitly rather than assumed: recordings and their transcripts/translations are now <strong>kept
+        permanently</strong> (not deleted after the request — see <a href="#history">§8a</a>), and Google Cloud is
+        used <strong>only to host this same self-hosted stack on a GPU VM</strong> — no Google AI/Speech API is
+        called anywhere. See <a href="#history">§8a</a> for the full detail.</p>
       </div>
     </header>
 
@@ -1059,22 +1070,68 @@ uvicorn app:app --host 0.0.0.0 --port 8002</code></pre>
       </div>
     </section>
 
+    <!-- 8a. HISTORY / MULTI-LANGUAGE / EXPORTS -->
+    <section id="history">
+      <h2><span class="num">08a</span> Recording history, languages &amp; exports</h2>
+      <p>Added for the platform-expansion requirements above. All of it lives inside the existing gateway
+      process — no new service, no external database.</p>
+
+      <h3 class="sub">What's new</h3>
+      <div class="grid-2">
+        <div class="card">
+          <h3 style="margin-top:0">Persistent history</h3>
+          <ul>
+            <li>Every recorded or uploaded clip is converted to MP3 (<code>lib/audioStorage.js</code>, ffmpeg) and kept in <code>recordings/</code></li>
+            <li>A SQLite row (<code>lib/db.js</code>, <code>lib/recordingsRepo.js</code>) tracks status, source/target language, transcription text, translation text, and timestamps through <code>pending → transcribing → transcribed → translating → completed/failed</code></li>
+            <li><code>routes/recordings.js</code> exposes list (search/filter/paginate), get, stream-audio, export, and delete — mounted at <code>/api/v1/recordings</code></li>
+            <li>Optional auto-pruning via <code>RECORDINGS_RETENTION_DAYS</code> (default <code>0</code> = keep forever)</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">Multi-language &amp; exports</h3>
+          <ul>
+            <li>Transcription accepts an optional <code>language</code> override (or auto-detect); translation accepts <code>sourceLanguage</code>/<code>targetLanguage</code> — the LLM prompt is built dynamically for the requested pair (<code>ai-services/translation/prompt.py</code>), not hardcoded to Urdu→English</li>
+            <li>Export a recording as TXT, DOCX, or PDF (<code>lib/exporters.js</code>) — the PDF path hand-rolls script-run splitting + RTL line layout since PDFKit has no built-in cross-script bidi/shaping</li>
+            <li>PDF Arabic-script text renders with Noto <strong>Naskh</strong> Arabic, not Nastaliq — Nastaliq crashed PDFKit on ordinary letter sequences and digits; Naskh has full glyph coverage and zero crashes (verified by rendering to PNG and visually inspecting, not just checking for exceptions)</li>
+            <li>"Save audio" downloads the stored MP3 directly from the browser — no re-encoding round trip</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3 class="sub">Frontend additions</h3>
+      <p>Create/History tabs; a drag-and-drop zone alongside the existing file picker; pause/resume on the recorder with a live canvas level meter (Web Audio API <code>AnalyserNode</code>); source/target language dropdowns; a History dashboard with search, status/source-type filters, pagination, a detail panel with inline audio playback, and per-recording export/delete.</p>
+
+      <h3 class="sub">Google Cloud — hosting only, not an AI dependency</h3>
+      <p>The requirements document named "Google Cloud" and mentioned Google Speech-to-Text as an example. The
+      explicit decision made for this project: Google Cloud is used strictly as a <strong>GPU VM host</strong> for
+      this same Docker Compose stack (T4/A100/L4 shapes, Deep Learning VM images, persistent disks for the named
+      volumes) — <strong>no Google AI/Speech API is integrated anywhere</strong>, preserving the "fully self-hosted,
+      no third-party inference" constraint from <a href="#overview">§1</a>. This has not been deployed or verified
+      against a real GCP project in this environment — see <a href="#appendix">§12</a>.</p>
+    </section>
+
     <!-- 9. PRIVACY -->
     <section id="privacy">
       <h2><span class="num">09</span> Privacy &amp; data lifecycle</h2>
+      <div class="callout" style="margin-bottom:16px">
+        <p><strong>Policy reversed in this revision:</strong> earlier revisions of this document said recordings and
+        text were never persisted. That has changed by explicit request — see <a href="#history">§8a</a>. The table
+        below reflects the <em>current</em> policy, not the original ephemeral one.</p>
+      </div>
       <div class="grid-2">
         <div class="card">
-          <h3 style="margin-top:0">What is never stored</h3>
+          <h3 style="margin-top:0">What is stored, and where</h3>
           <ul>
-            <li>Uploaded audio — deleted in a <code>finally</code> block at both the gateway and the transcription service</li>
-            <li>Urdu / English text — held in memory for the request only, never written to disk or a database</li>
-            <li>Anything used for model training — both models are frozen, pre-trained checkpoints run purely for inference</li>
+            <li>Converted MP3 audio — kept permanently in <code>recordings/</code> (a Docker named volume in Compose) until deleted by the user or pruned by <code>RECORDINGS_RETENTION_DAYS</code></li>
+            <li>Transcription/translation text and metadata — kept in the SQLite DB at <code>data/app.db</code>, same lifecycle as the audio</li>
+            <li>The original multipart upload in <code>uploads/</code> is still transient — deleted once conversion to MP3 succeeds or fails</li>
+            <li>Anything used for model training — still nothing; both models are frozen, pre-trained checkpoints run purely for inference</li>
           </ul>
         </div>
         <div class="card">
           <h3 style="margin-top:0">What logs actually contain</h3>
           <ul>
-            <li>Request IDs, durations, byte counts, HTTP status codes</li>
+            <li>Request IDs, durations, byte counts, HTTP status codes, recording IDs</li>
             <li>Never: raw Urdu/English text, audio bytes, tokens, or API keys — redacted by construction in <code>lib/logger.js</code> / <code>logging_utils.py</code>, not by remembering to scrub each call site</li>
             <li>Verified by <code>tests/logger.test.js</code> and <code>tests/privacyLogging.test.js</code></li>
           </ul>
@@ -1088,11 +1145,11 @@ uvicorn app:app --host 0.0.0.0 --port 8002</code></pre>
       <div class="grid-3">
         <div class="card">
           <span class="eyebrow">Node</span>
-          <p style="margin:8px 0 0"><strong>46 tests</strong>, Jest + supertest, AI-service calls mocked via <code>axios</code>. Covers auth, rate limiting, rollback, timeouts, oversized input, temp-file cleanup, privacy-safe logging, upload-filename sanitization, and mTLS agent construction (with real throwaway certs).</p>
+          <p style="margin:8px 0 0"><strong>79 tests</strong>, Jest + supertest, AI-service calls mocked via <code>axios</code>. Covers auth, rate limiting, rollback, timeouts, oversized input, temp-file cleanup, privacy-safe logging, upload-filename sanitization, mTLS agent construction (with real throwaway certs), plus recording persistence/CRUD, retention pruning, and TXT/DOCX/PDF export generation using real ffmpeg-converted audio.</p>
         </div>
         <div class="card">
           <span class="eyebrow">Python</span>
-          <p style="margin:8px 0 0"><strong>44 tests</strong> (2 more skipped by design), pytest, <code>model_backend</code> stubbed so torch/faster-whisper never need installing for unit tests. Covers chunking (including the word-level fallback for punctuation-free oversized text), prompt-injection defense, concurrency semaphores.</p>
+          <p style="margin:8px 0 0"><strong>55 tests</strong> (2 more skipped by design), pytest, <code>model_backend</code> stubbed so torch/faster-whisper never need installing for unit tests. Covers chunking (including the word-level fallback for punctuation-free oversized text), prompt-injection defense, concurrency semaphores, per-request language overrides, and dynamic language-pair prompt construction.</p>
         </div>
         <div class="card">
           <span class="eyebrow">Integration</span>
@@ -1107,11 +1164,15 @@ uvicorn app:app --host 0.0.0.0 --port 8002</code></pre>
       <div class="scroller">
         <pre><code>server/
 ├── serve.js                      <span class="c"># gateway entrypoint (no external AI calls anywhere)</span>
-├── lib/                          <span class="c"># config, logger, requestId, serviceClient (mTLS), concurrencyGuard, rateLimiters</span>
+├── lib/                          <span class="c"># config, logger, requestId, serviceClient (mTLS), concurrencyGuard, rateLimiters,</span>
+│                                  <span class="c"># db, recordingsRepo, audioStorage, exporters</span>
 ├── middleware/                   <span class="c"># auth, errorHandler</span>
-├── routes/                       <span class="c"># transcribe, translate, health</span>
-├── public/                       <span class="c"># index.html, app.js, style.css</span>
-├── tests/                        <span class="c"># 46 Jest tests + tests/integration/ (gated)</span>
+├── routes/                       <span class="c"># transcribe, translate, health, recordings</span>
+├── public/                       <span class="c"># index.html, app.js, style.css (Create/History tabs, drag-drop, visualizer)</span>
+├── assets/fonts/                 <span class="c"># NotoNaskhArabic-Regular.ttf (embedded PDF export font)</span>
+├── data/                         <span class="c"># SQLite DB (gitignored, Docker named volume)</span>
+├── recordings/                   <span class="c"># permanent MP3 store (gitignored, Docker named volume)</span>
+├── tests/                        <span class="c"># 79 Jest tests + tests/integration/ (gated)</span>
 ├── scripts/generate-internal-certs.sh   <span class="c"># internal CA + mTLS certs</span>
 ├── deploy/Caddyfile               <span class="c"># optional public HTTPS reverse proxy</span>
 ├── ai-services/
@@ -1124,7 +1185,7 @@ uvicorn app:app --host 0.0.0.0 --port 8002</code></pre>
 │       ├── requirements.txt, requirements-dev.txt, Dockerfile, healthcheck.sh
 │       └── tests/
 ├── Dockerfile                    <span class="c"># gateway image</span>
-├── docker-compose.yml            <span class="c"># all three services + optional reverse-proxy, mTLS wiring</span>
+├── docker-compose.yml            <span class="c"># all three services + optional reverse-proxy, mTLS wiring, persistent volumes</span>
 ├── .env.example
 └── docs/AI_FEATURE.md            <span class="c"># repo-resident version of this document</span></code></pre>
       </div>
@@ -1144,6 +1205,15 @@ uvicorn app:app --host 0.0.0.0 --port 8002</code></pre>
         <li>Alert on sustained <code>ai_service_error</code> / 503 rates in gateway logs (GPU saturation or a crashed model process)</li>
         <li>Track <code>transcription_completed.duration_ms</code> and <code>translation_completed.duration_ms</code> as separate latency series</li>
         <li>Alert on internal mTLS cert expiry — <code>scripts/generate-internal-certs.sh</code> has no automated renewal (825-day default validity)</li>
+        <li>Alert on disk usage for the <code>gateway-data</code>/<code>gateway-recordings</code> volumes — with <code>RECORDINGS_RETENTION_DAYS=0</code> (the default) they grow unbounded</li>
+      </ul>
+
+      <h3 class="sub">Known gaps — honestly unverified in this environment</h3>
+      <ul>
+        <li>No per-user authentication/ownership on recording history yet — anyone with API access sees all recordings; add auth before a multi-tenant deployment</li>
+        <li><code>better-sqlite3</code>/ffmpeg compatibility with the Alpine (musl) gateway image was verified by reading the packages' prebuilt-binary source logic, not by actually running <code>docker build</code> — Docker Desktop's daemon was unavailable in this sandbox</li>
+        <li>Retention pruning (<code>RECORDINGS_RETENTION_DAYS</code>) is unit-tested but not exercised against real aged production data</li>
+        <li>Google Cloud hosting (see <a href="#history">§8a</a>) has not been deployed or tested against a real GCP project — the guidance is deployment instructions, not a verified deployment</li>
       </ul>
 
       <h3 class="sub">Performance targets (not yet measured — no production GPU access)</h3>
@@ -1161,6 +1231,9 @@ uvicorn app:app --host 0.0.0.0 --port 8002</code></pre>
       <p>These are targets to benchmark against, not measured results — see the compliance note above. Full table in <code>docs/AI_FEATURE.md</code> §6.</p>
 
       <h3 class="sub">QA sample set (Urdu → English)</h3>
+      <p>Shown here as the original representative set; the app now accepts any of ~22 language pairs (§8a) and the
+      full QA checklist in <code>docs/AI_FEATURE.md</code> §9 also covers drag-and-drop, pause/resume, exports, and
+      history CRUD.</p>
       <div class="scroller">
         <table>
           <thead><tr><th>Style</th><th>Urdu</th><th>Expected English</th></tr></thead>

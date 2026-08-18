@@ -13,6 +13,9 @@ const { generalLimiter } = require("./lib/rateLimiters");
 const transcribeRouter = require("./routes/transcribe");
 const translateRouter = require("./routes/translate");
 const healthRouter = require("./routes/health");
+const recordingsRouter = require("./routes/recordings");
+const recordingsRepo = require("./lib/recordingsRepo");
+const audioStorage = require("./lib/audioStorage");
 
 const app = express();
 
@@ -76,6 +79,7 @@ if (config.enableAiFeatures) {
     });
 }
 
+app.use("/api/v1/recordings", recordingsRouter);
 app.use("/api/v1", healthRouter);
 
 // Legacy health check endpoint (preserved for existing monitoring)
@@ -92,6 +96,21 @@ app.use(["/api", "/transcribe"], (req, res) => {
 // Central error handler (must be last)
 app.use(errorHandler);
 
+async function pruneExpiredRecordings() {
+    if (!config.recordingsRetentionDays) return; // 0 = keep forever
+    try {
+        const expired = recordingsRepo.pruneExpired(config.recordingsRetentionDays);
+        for (const recording of expired) {
+            await audioStorage.deleteStoredFile(recording.stored_filename);
+        }
+        if (expired.length > 0) {
+            logger.info("recordings_retention_pruned", { count: expired.length });
+        }
+    } catch (err) {
+        logger.error("recordings_retention_prune_failed", { errorName: err?.name });
+    }
+}
+
 function start() {
     const server = app.listen(config.port, () => {
         logger.info("server_started", { port: config.port, aiFeaturesEnabled: config.enableAiFeatures });
@@ -100,6 +119,10 @@ function start() {
     // Harden against slow-loris style connections holding the server open.
     server.requestTimeout = 5 * 60 * 1000;
     server.headersTimeout = 65 * 1000;
+
+    pruneExpiredRecordings();
+    const retentionInterval = setInterval(pruneExpiredRecordings, 24 * 60 * 60 * 1000);
+    retentionInterval.unref();
 
     let shuttingDown = false;
     function shutdown(signal) {

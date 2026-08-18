@@ -3,7 +3,7 @@ import tempfile
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 import config
@@ -52,7 +52,12 @@ def ready():
 
 
 @app.post("/v1/transcribe")
-async def transcribe(request: Request, file: UploadFile = File(...), _: None = Depends(verify_token)):
+async def transcribe(
+    request: Request,
+    file: UploadFile = File(...),
+    language: str = Form(default=""),
+    _: None = Depends(verify_token),
+):
     if not model_backend.is_ready():
         raise HTTPException(status_code=503, detail="Model is not loaded yet")
 
@@ -88,7 +93,7 @@ async def transcribe(request: Request, file: UploadFile = File(...), _: None = D
             raise HTTPException(status_code=400, detail="Uploaded audio file is empty")
 
         started = time.monotonic()
-        result = await run_transcription(tmp_path)
+        result = await run_transcription(tmp_path, language.strip() or None)
         log(
             logger,
             "info",
@@ -111,7 +116,7 @@ async def transcribe(request: Request, file: UploadFile = File(...), _: None = D
                 log(logger, "warning", "temp_file_cleanup_failed", error_type=type(exc).__name__)
 
 
-async def run_transcription(tmp_path):
+async def run_transcription(tmp_path, language_override):
     import asyncio
 
-    return await asyncio.to_thread(model_backend.transcribe_file, tmp_path)
+    return await asyncio.to_thread(model_backend.transcribe_file, tmp_path, language_override)
