@@ -2,8 +2,10 @@ node_modules/
 .env
 uploads/*
 !uploads/.gitkeep
-audio-cache/
 *.log
+
+# Generated internal mTLS certs/keys - never commit real key material
+certs/
 
 # Local Claude Code tool-permission cache, not project config
 .claude/

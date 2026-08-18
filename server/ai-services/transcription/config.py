@@ -17,6 +17,14 @@ def _int(value, default):
 SERVICE_PORT = _int(os.environ.get("SERVICE_PORT"), 8001)
 INTERNAL_SERVICE_TOKEN = os.environ.get("INTERNAL_SERVICE_TOKEN", "")
 
+# Mutual TLS for the gateway<->service link. When enabled, uvicorn (started
+# via the Dockerfile CMD) terminates TLS and requires a client certificate
+# signed by TLS_CLIENT_CA_FILE - see scripts/generate-internal-certs.sh.
+TLS_ENABLED = _bool(os.environ.get("TLS_ENABLED"), False)
+TLS_CERT_FILE = os.environ.get("TLS_CERT_FILE", "")
+TLS_KEY_FILE = os.environ.get("TLS_KEY_FILE", "")
+TLS_CLIENT_CA_FILE = os.environ.get("TLS_CLIENT_CA_FILE", "")
+
 # "auto" resolves to cuda if available at startup, else cpu.
 WHISPER_MODEL_SIZE = os.environ.get("WHISPER_MODEL_SIZE", "medium")
 WHISPER_DEVICE = os.environ.get("WHISPER_DEVICE", "auto")

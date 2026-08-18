@@ -13,7 +13,7 @@ COPY middleware ./middleware
 COPY routes ./routes
 COPY public ./public
 
-RUN mkdir -p uploads audio-cache \
+RUN mkdir -p uploads \
     && addgroup -S appgroup && adduser -S appuser -G appgroup \
     && chown -R appuser:appgroup /app
 

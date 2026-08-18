@@ -1,26 +1,44 @@
 # Requires the NVIDIA Container Toolkit on the host for the `gpu` device
 # reservations below to work (https://github.com/NVIDIA/nvidia-container-toolkit).
-# Only `gateway` publishes a port; the two AI services are reachable only
-# from other containers on the `internal` network.
+#
+# Before first `docker compose up`, generate the internal mTLS certs:
+#   ./scripts/generate-internal-certs.sh
+#
+# Only `gateway` publishes a port (bound to loopback only - see below), and
+# only to make local testing easy; the two AI services are reachable only
+# from other containers on the `internal` network, and every hop between
+# gateway and an AI service is mutual TLS (see docs/AI_FEATURE.md). For a
+# real public deployment, run with `--profile proxy` to also start the
+# TLS-terminating reverse proxy in front of the gateway - see deploy/Caddyfile.
 
 services:
   gateway:
     build: .
     image: urdu-app-gateway:local
     ports:
-      - "3000:3000"
+      # Loopback-only: reachable as http://localhost:3000 for local testing,
+      # but not exposed on the host's public network interfaces. Real
+      # external traffic should come in through the `reverse-proxy` service
+      # (--profile proxy), which terminates public HTTPS.
+      - "127.0.0.1:3000:3000"
     env_file:
       - .env
     environment:
-      TRANSCRIPTION_SERVICE_URL: http://transcription:8001
-      TRANSLATION_SERVICE_URL: http://translation:8002
+      TRANSCRIPTION_SERVICE_URL: https://transcription:8001
+      TRANSLATION_SERVICE_URL: https://translation:8002
+      INTERNAL_TLS_ENABLED: "true"
+      INTERNAL_TLS_CLIENT_CERT_FILE: /certs/gateway-client.crt
+      INTERNAL_TLS_CLIENT_KEY_FILE: /certs/gateway-client.key
+      INTERNAL_TLS_CA_FILE: /certs/ca.crt
+    volumes:
+      - ./certs:/certs:ro
     depends_on:
       - transcription
       - translation
     networks:
       - internal
     restart: unless-stopped
-    read_only: false # multer/TTS cache write to ./uploads and ./audio-cache
+    read_only: false # multer writes uploaded audio to ./uploads (deleted per-request)
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', r => process.exit(r.statusCode===200?0:1)).on('error', () => process.exit(1))"]
       interval: 30s
@@ -45,17 +63,23 @@ services:
       # cache paths differ, regardless of what .env itself contains.
       SERVICE_PORT: "8001"
       MODEL_CACHE_DIR: /models/whisper
+      TLS_ENABLED: "true"
+      TLS_CERT_FILE: /certs/transcription-server.crt
+      TLS_KEY_FILE: /certs/transcription-server.key
+      TLS_CLIENT_CA_FILE: /certs/ca.crt
+      # Reused only by this container's own Docker healthcheck (calling its
+      # own /health over TLS, which - like any client - needs a cert once
+      # mTLS is enforced). Grants no inbound access; it's a client cert.
+      INTERNAL_TLS_CLIENT_CERT_FILE: /certs/gateway-client.crt
+      INTERNAL_TLS_CLIENT_KEY_FILE: /certs/gateway-client.key
     volumes:
       - whisper-model-cache:/models/whisper
+      - ./certs:/certs:ro
     networks:
       - internal
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=3)"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 120s
+    # Healthcheck logic (including the TLS_ENABLED branch) lives in the
+    # image's own Dockerfile HEALTHCHECK (healthcheck.sh) - not overridden here.
     deploy:
       resources:
         limits:
@@ -75,17 +99,18 @@ services:
       # See the same note on the transcription service above.
       SERVICE_PORT: "8002"
       MODEL_CACHE_DIR: /models/translation
+      TLS_ENABLED: "true"
+      TLS_CERT_FILE: /certs/translation-server.crt
+      TLS_KEY_FILE: /certs/translation-server.key
+      TLS_CLIENT_CA_FILE: /certs/ca.crt
+      INTERNAL_TLS_CLIENT_CERT_FILE: /certs/gateway-client.crt
+      INTERNAL_TLS_CLIENT_KEY_FILE: /certs/gateway-client.key
     volumes:
       - translation-model-cache:/models/translation
+      - ./certs:/certs:ro
     networks:
       - internal
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health', timeout=3)"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 300s
     deploy:
       resources:
         limits:
@@ -96,11 +121,46 @@ services:
               count: 1
               capabilities: [gpu]
 
+  # Optional public-facing TLS termination: `docker compose --profile proxy up -d`.
+  # Set PUBLIC_DOMAIN to a real domain pointing at this host for Caddy to
+  # automatically obtain a Let's Encrypt certificate; left at the default
+  # ("localhost") it uses Caddy's own locally-trusted certificate instead,
+  # suitable for internal/testing use only. See deploy/Caddyfile.
+  reverse-proxy:
+    image: caddy:2-alpine
+    profiles: ["proxy"]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:-localhost}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - gateway
+    networks:
+      - internal
+      - public
+    restart: unless-stopped
+
 networks:
   internal:
     driver: bridge
-    internal: false # set to `true` once the gateway no longer needs external egress (e.g. OpenAI TTS) - see docs/AI_FEATURE.md
+    # Egress is needed once, at first startup, for the transcription/
+    # translation containers to download open-weight model files from
+    # Hugging Face into their cache volumes (see below) - not for inference,
+    # which never leaves this network. It is not set to `internal: true`
+    # because that one-time download would then have no route out; the
+    # bearer-token auth, per-service mTLS, and the fact that no port is
+    # published are the controls actually protecting this network.
+    internal: false
+  public:
+    driver: bridge
 
 volumes:
   whisper-model-cache:
   translation-model-cache:
+  caddy-data:
+  caddy-config:

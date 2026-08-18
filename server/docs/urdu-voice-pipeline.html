@@ -439,7 +439,16 @@
         <span class="chip">Python · FastAPI</span>
         <span class="chip">faster-whisper (CUDA)</span>
         <span class="chip">Qwen2.5-Instruct (CUDA)</span>
+        <span class="chip">Mutual TLS internally</span>
         <span class="chip">Docker Compose · NVIDIA Container Toolkit</span>
+      </div>
+      <div class="callout" style="margin-top:8px">
+        <p><strong>Compliance update:</strong> a formal SOW review flagged unencrypted gateway↔AI-service traffic and
+        the OpenAI-backed <code>/speak</code> route as gaps. Both are resolved as of this revision — see
+        <a href="#security">§5 Security model</a> and <a href="#gpu-compose">§7 Docker Compose</a> for mutual TLS,
+        and the design-constraints table just below for the <code>/speak</code>/OpenAI removal. Production performance
+        and full end-to-end QA still require the real GPU server, which remains outside this environment's access —
+        reported honestly as pending in <a href="#appendix">§12</a>, not claimed as done.</p>
       </div>
     </header>
 
@@ -462,9 +471,9 @@
       <table>
         <thead><tr><th>Constraint</th><th>Consequence</th></tr></thead>
         <tbody>
-          <tr><td>No third-party AI APIs</td><td>Both models run in-process on your own GPU(s); the gateway never calls out to OpenAI/Anthropic/Google for transcription or translation.</td></tr>
+          <tr><td>Zero third-party AI APIs</td><td>Both models run in-process on your own GPU(s); nothing in this app calls OpenAI/Anthropic/Google for anything — the previous OpenAI-backed <code>/speak</code> route was removed entirely as part of this revision.</td></tr>
           <tr><td>Target GPU specs unknown</td><td>Model size, precision, quantization, batch size, and context length are all environment variables with tier-appropriate defaults — see <a href="#models">§6</a>.</td></tr>
-          <tr><td>Existing app must keep working</td><td>The gateway is the same Express process as before; <code>/speak</code> and <code>/health</code> are untouched, and a single flag (<code>ENABLE_AI_FEATURES=false</code>) fully disables the new feature.</td></tr>
+          <tr><td>Existing app must keep working</td><td>The gateway is the same Express process as before; <code>/health</code> is untouched, and a single flag (<code>ENABLE_AI_FEATURES=false</code>) fully disables the new feature.</td></tr>
           <tr><td>Shared GPU, bursty traffic</td><td>Concurrency is bounded at three independent layers so a burst of requests degrades to a fast 503 instead of an out-of-memory crash — see <a href="#security">§5</a>.</td></tr>
         </tbody>
       </table>
@@ -494,11 +503,11 @@
             <text x="380" y="150" text-anchor="middle" class="lbl-sm">serve.js · :3000 (only published port)</text>
 
             <line x1="340" y1="166" x2="200" y2="250" class="msg" marker-end="url(#arrow)"></line>
-            <text x="150" y="212" class="lbl-sm">Bearer token</text>
+            <text x="150" y="212" class="lbl-sm">mTLS + Bearer token</text>
             <text x="150" y="225" class="lbl-sm">multipart/form-data</text>
 
             <line x1="420" y1="166" x2="560" y2="250" class="msg" marker-end="url(#arrow)"></line>
-            <text x="470" y="212" class="lbl-sm">Bearer token</text>
+            <text x="470" y="212" class="lbl-sm">mTLS + Bearer token</text>
             <text x="470" y="225" class="lbl-sm">JSON</text>
 
             <rect class="box" x="80" y="250" width="240" height="64" rx="8"></rect>
@@ -526,7 +535,7 @@
             </defs>
           </svg>
         </div>
-        <figcaption><strong>Fig. 1 — Topology.</strong> The gateway is the only component that straddles the public/private boundary. Both AI services sit on an internal-only Docker network with no published port, and each mounts a persistent volume so model weights are downloaded once, not per request.</figcaption>
+        <figcaption><strong>Fig. 1 — Topology.</strong> The gateway is the only component that straddles the public/private boundary — in production it sits behind an optional TLS-terminating reverse proxy (Caddy, §7) rather than taking browser HTTPS directly. Both AI services sit on an internal-only Docker network with no published port and require mutual TLS on every call, and each mounts a persistent volume so model weights are downloaded once, not per request.</figcaption>
       </figure>
 
       <p>
@@ -560,7 +569,7 @@
             <text x="440" y="135" class="lbl-sm">to /uploads</text>
 
             <line x1="380" y1="165" x2="650" y2="165" class="msg" marker-end="url(#arrow2)"></line>
-            <text x="515" y="157" text-anchor="middle" class="lbl-sm">POST /v1/transcribe · Bearer token</text>
+            <text x="515" y="157" text-anchor="middle" class="lbl-sm">POST /v1/transcribe · mTLS + Bearer token</text>
 
             <path d="M650,195 h55 v22 h-55" class="msg" marker-end="url(#arrow2)"></path>
             <text x="600" y="238" text-anchor="middle" class="lbl-sm">mkstemp + faster-whisper.transcribe(language="ur")</text>
@@ -607,7 +616,7 @@
             <text x="440" y="130" class="lbl-sm">over 20,000 chars</text>
 
             <line x1="380" y1="155" x2="650" y2="155" class="msg" marker-end="url(#arrow3)"></line>
-            <text x="515" y="147" text-anchor="middle" class="lbl-sm">POST /v1/translate · Bearer token</text>
+            <text x="515" y="147" text-anchor="middle" class="lbl-sm">POST /v1/translate · mTLS + Bearer token</text>
 
             <path d="M650,180 h55 v22 h-55" class="msg" marker-end="url(#arrow3)"></path>
             <text x="710" y="215" class="lbl-sm">build_batches(): split by</text>
@@ -651,7 +660,7 @@
           <tr><td><code>lib/config.js</code></td><td>Parses every env var once, with defaults; nothing else reads <code>process.env</code> directly.</td></tr>
           <tr><td><code>lib/logger.js</code></td><td>Structured JSON logs; redacts known-sensitive keys and truncates long strings by construction.</td></tr>
           <tr><td><code>lib/requestId.js</code></td><td>Assigns/echoes <code>X-Request-Id</code> for cross-service log correlation.</td></tr>
-          <tr><td><code>lib/serviceClient.js</code></td><td>Axios client to each AI service: bearer token, timeout, abort-on-disconnect, normalizes failures into safe HTTP statuses.</td></tr>
+          <tr><td><code>lib/serviceClient.js</code></td><td>Axios client to each AI service: mutual-TLS <code>https.Agent</code> (client cert + CA), bearer token, timeout, abort-on-disconnect, normalizes failures into safe HTTP statuses.</td></tr>
           <tr><td><code>lib/concurrencyGuard.js</code></td><td>In-process counter middleware — fails fast with 503 above the configured in-flight limit.</td></tr>
           <tr><td><code>lib/rateLimiters.js</code></td><td>Per-route <code>express-rate-limit</code> instances (transcribe / translate / general).</td></tr>
           <tr><td><code>middleware/auth.js</code></td><td>Optional <code>x-api-key</code> gate, off by default.</td></tr>
@@ -744,12 +753,12 @@ END_MARKER   = <span class="k">"&lt;&lt;&lt;URDU_TEXT_END&gt;&gt;&gt;"</span>
             <text x="655" y="300" class="lbl-sm" style="opacity:.75">mitigates: burst GPU overload</text>
 
             <polygon points="337,316 563,316 552,350 348,350" class="box"></polygon>
-            <text x="20" y="338" class="lbl">Internal network isolation</text>
-            <text x="655" y="338" class="lbl-sm" style="opacity:.75">mitigates: direct access to AI services</text>
+            <text x="20" y="338" class="lbl">Network isolation + mutual TLS</text>
+            <text x="655" y="338" class="lbl-sm" style="opacity:.75">mitigates: direct access &amp; eavesdropping</text>
 
             <polygon points="348,354 552,354 541,388 359,388" class="box"></polygon>
             <text x="20" y="376" class="lbl">Service bearer token</text>
-            <text x="655" y="376" class="lbl-sm" style="opacity:.75">mitigates: unauthorized internal calls</text>
+            <text x="655" y="376" class="lbl-sm" style="opacity:.75">mitigates: unauthorized internal calls (after mTLS)</text>
 
             <polygon points="359,392 541,392 530,426 370,426" class="box-accent"></polygon>
             <text x="20" y="414" class="lbl" style="color:var(--accent-ink)">Per-service GPU semaphore</text>
@@ -837,10 +846,12 @@ END_MARKER   = <span class="k">"&lt;&lt;&lt;URDU_TEXT_END&gt;&gt;&gt;"</span>
 
             <rect x="330" y="160" width="160" height="56" rx="8" class="box-accent"></rect>
             <text x="410" y="183" text-anchor="middle" class="box-title">gateway</text>
-            <text x="410" y="199" text-anchor="middle" class="lbl-sm">:3000 · published to host</text>
+            <text x="410" y="199" text-anchor="middle" class="lbl-sm">:3000 · loopback-only publish</text>
 
             <line x1="370" y1="216" x2="200" y2="300" class="msg" marker-end="url(#arrow5)"></line>
+            <text x="230" y="255" class="lbl-sm" style="opacity:.75">mTLS</text>
             <line x1="450" y1="216" x2="630" y2="300" class="msg" marker-end="url(#arrow5)"></line>
+            <text x="530" y="255" class="lbl-sm" style="opacity:.75">mTLS</text>
 
             <rect x="90" y="300" width="220" height="66" rx="8" class="box"></rect>
             <text x="200" y="322" text-anchor="middle" class="box-title">transcription</text>
@@ -867,7 +878,7 @@ END_MARKER   = <span class="k">"&lt;&lt;&lt;URDU_TEXT_END&gt;&gt;&gt;"</span>
             </defs>
           </svg>
         </div>
-        <figcaption><strong>Fig. 5 — Deployment topology.</strong> Only the gateway's port is published; the GPU is a host-level device shared by two containers through the NVIDIA Container Toolkit, each with its own concurrency semaphore so they can't starve each other of VRAM.</figcaption>
+        <figcaption><strong>Fig. 5 — Deployment topology.</strong> The gateway's port is bound to loopback only; the reverse proxy shown here is the bundled Caddy service (<code>deploy/Caddyfile</code>, <code>--profile proxy</code>) providing automatic public HTTPS. Gateway↔AI-service calls are mutual TLS. The GPU is a host-level device shared by two containers through the NVIDIA Container Toolkit, each with its own concurrency semaphore so they can't starve each other of VRAM.</figcaption>
       </figure>
 
       <h3 id="gpu-prereq">Prerequisites</h3>
@@ -878,6 +889,7 @@ END_MARKER   = <span class="k">"&lt;&lt;&lt;URDU_TEXT_END&gt;&gt;&gt;"</span>
           <tr><td>Docker Engine + Compose v2</td><td>Runs <code>docker-compose.yml</code></td></tr>
           <tr><td><a href="https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html">NVIDIA Container Toolkit</a></td><td>Lets containers see <code>/dev/nvidia*</code> and CUDA libraries</td></tr>
           <tr><td>~15GB free disk under the model cache path</td><td>Whisper <code>medium</code> (~1.5GB) + Qwen2.5-7B in 4-bit (~5GB) plus headroom for a larger tier later</td></tr>
+          <tr><td>OpenSSL</td><td>Used by <code>scripts/generate-internal-certs.sh</code> to generate the internal mTLS certs (§2 below) — no external CA/dependency needed</td></tr>
         </tbody>
       </table>
 
@@ -915,6 +927,12 @@ openssl rand -hex 32   <span class="c"># paste the output into INTERNAL_SERVICE_
           </div>
         </li>
         <li>
+          <strong>Generate the internal mTLS certs</strong> (gateway↔AI-service encryption — see §5):
+          <div class="scroller">
+            <pre><code>./scripts/generate-internal-certs.sh   <span class="c"># writes server/certs/ (gitignored)</span></code></pre>
+          </div>
+        </li>
+        <li>
           <strong>Build and start</strong>:
           <div class="scroller">
             <pre><code>docker compose build
@@ -934,7 +952,16 @@ docker compose ps       <span class="c"># all three services should show "health
 <span class="c"># {"status":"ready","aiFeaturesEnabled":true,"services":{"transcription":true,"translation":true}}</span></code></pre>
           </div>
         </li>
-        <li>Put a TLS-terminating reverse proxy (nginx/Caddy/your load balancer) in front of port 3000 — the app itself speaks plain HTTP, matching the pre-existing setup.</li>
+        <li>
+          <strong>For real public traffic</strong>, start the bundled TLS-terminating reverse proxy (Caddy) instead of
+          relying on the loopback-only gateway port — point a real domain's DNS at this host first:
+          <div class="scroller">
+            <pre><code>PUBLIC_DOMAIN=your-domain.example.com docker compose --profile proxy up -d</code></pre>
+          </div>
+          Caddy (<code>deploy/Caddyfile</code>) automatically obtains and renews a Let's Encrypt certificate for
+          <code>PUBLIC_DOMAIN</code>. Left unset, it defaults to <code>localhost</code> with a locally-trusted
+          certificate only — fine for internal testing, not for real public traffic.
+        </li>
       </ol>
 
       <h3 id="gpu-native">Path B — Native / bare-metal (no Docker)</h3>
@@ -982,6 +1009,9 @@ uvicorn app:app --host 0.0.0.0 --port 8002</code></pre>
             <tr><td>503 <code>"...is busy, please try again shortly"</code> under moderate load</td><td>Working as designed — the concurrency guard is protecting VRAM</td><td>Raise <code>MAX_CONCURRENT_TRANSCRIPTIONS</code> / <code>MAX_CONCURRENT_TRANSLATIONS</code> only if VRAM headroom actually allows it</td></tr>
             <tr><td>First translation request after startup is very slow</td><td>Expected — model weights are loading/warming up</td><td><code>WARMUP_ON_STARTUP=true</code> (default) runs one throwaway generation at boot so the <em>first real user request</em> isn't the slow one</td></tr>
             <tr><td>Devices load, but <code>device: "cpu"</code> in the logs</td><td><code>ctranslate2</code>/<code>torch</code> installed without CUDA support, or driver mismatch</td><td>Reinstall following the exact commands in Path B step 3, matching your driver's CUDA version</td></tr>
+            <tr><td>Gateway logs <code>INTERNAL_TLS_ENABLED=true requires ... to all be set</code> and exits immediately</td><td>Certs not generated, or the env var paths don't match where they're mounted</td><td>Run <code>./scripts/generate-internal-certs.sh</code> before <code>docker compose up</code>; confirm the <code>./certs:/certs:ro</code> mount is present</td></tr>
+            <tr><td>An AI service's TLS handshake fails / connection reset from the gateway</td><td>Certs regenerated on one side only, or a stale cached <code>https.Agent</code> from an old process</td><td>Regenerate <em>all</em> certs together (the script always rotates the full set) and restart all three containers, not just one</td></tr>
+            <tr><td>Caddy never gets a trusted public certificate</td><td><code>PUBLIC_DOMAIN</code> unset (defaults to <code>localhost</code>), or DNS doesn't yet point at this host</td><td>Set <code>PUBLIC_DOMAIN</code> to a real domain whose A/AAAA record already resolves to this host, then retry</td></tr>
           </tbody>
         </table>
       </div>
@@ -1058,7 +1088,7 @@ uvicorn app:app --host 0.0.0.0 --port 8002</code></pre>
       <div class="grid-3">
         <div class="card">
           <span class="eyebrow">Node</span>
-          <p style="margin:8px 0 0"><strong>40 tests</strong>, Jest + supertest, AI-service calls mocked via <code>axios</code>. Covers auth, rate limiting, rollback, timeouts, oversized input, temp-file cleanup, privacy-safe logging, and upload-filename sanitization.</p>
+          <p style="margin:8px 0 0"><strong>46 tests</strong>, Jest + supertest, AI-service calls mocked via <code>axios</code>. Covers auth, rate limiting, rollback, timeouts, oversized input, temp-file cleanup, privacy-safe logging, upload-filename sanitization, and mTLS agent construction (with real throwaway certs).</p>
         </div>
         <div class="card">
           <span class="eyebrow">Python</span>
@@ -1076,23 +1106,25 @@ uvicorn app:app --host 0.0.0.0 --port 8002</code></pre>
       <h2><span class="num">11</span> File structure</h2>
       <div class="scroller">
         <pre><code>server/
-├── serve.js                      <span class="c"># gateway entrypoint</span>
-├── lib/                          <span class="c"># config, logger, requestId, serviceClient, concurrencyGuard, rateLimiters</span>
+├── serve.js                      <span class="c"># gateway entrypoint (no external AI calls anywhere)</span>
+├── lib/                          <span class="c"># config, logger, requestId, serviceClient (mTLS), concurrencyGuard, rateLimiters</span>
 ├── middleware/                   <span class="c"># auth, errorHandler</span>
 ├── routes/                       <span class="c"># transcribe, translate, health</span>
 ├── public/                       <span class="c"># index.html, app.js, style.css</span>
-├── tests/                        <span class="c"># 37 Jest tests + tests/integration/ (gated)</span>
+├── tests/                        <span class="c"># 46 Jest tests + tests/integration/ (gated)</span>
+├── scripts/generate-internal-certs.sh   <span class="c"># internal CA + mTLS certs</span>
+├── deploy/Caddyfile               <span class="c"># optional public HTTPS reverse proxy</span>
 ├── ai-services/
-│   ├── transcription/            <span class="c"># FastAPI + faster-whisper, :8001</span>
+│   ├── transcription/            <span class="c"># FastAPI + faster-whisper, :8001, mTLS server</span>
 │   │   ├── app.py, model_backend.py, config.py, concurrency.py, logging_utils.py
-│   │   ├── requirements.txt, requirements-dev.txt, Dockerfile
+│   │   ├── requirements.txt, requirements-dev.txt, Dockerfile, healthcheck.sh
 │   │   └── tests/
-│   └── translation/               <span class="c"># FastAPI + transformers, :8002</span>
+│   └── translation/               <span class="c"># FastAPI + transformers, :8002, mTLS server</span>
 │       ├── app.py, model_backend.py, prompt.py, chunker.py, config.py, concurrency.py, logging_utils.py
-│       ├── requirements.txt, requirements-dev.txt, Dockerfile
+│       ├── requirements.txt, requirements-dev.txt, Dockerfile, healthcheck.sh
 │       └── tests/
 ├── Dockerfile                    <span class="c"># gateway image</span>
-├── docker-compose.yml            <span class="c"># all three services, GPU reservations, internal network</span>
+├── docker-compose.yml            <span class="c"># all three services + optional reverse-proxy, mTLS wiring</span>
 ├── .env.example
 └── docs/AI_FEATURE.md            <span class="c"># repo-resident version of this document</span></code></pre>
       </div>
@@ -1103,15 +1135,30 @@ uvicorn app:app --host 0.0.0.0 --port 8002</code></pre>
       <h2><span class="num">12</span> Rollback, monitoring &amp; QA</h2>
 
       <h3 class="sub">Rollback</h3>
-      <p>This was an additive change — nothing existing was removed. Fastest rollback: set <code>ENABLE_AI_FEATURES=false</code> and restart the gateway; the new routes return <code>503</code> immediately while <code>/speak</code>, <code>/health</code>, and the static UI keep working. Full rollback: stop the <code>transcription</code>/<code>translation</code> containers, or redeploy the gateway from before this change.</p>
+      <p>This was almost entirely an additive change — the one deliberate removal was the OpenAI-backed <code>/speak</code> route (see the compliance note below), a requested fix, not a regression. Fastest rollback of the rest: set <code>ENABLE_AI_FEATURES=false</code> and restart the gateway; the new routes return <code>503</code> immediately while <code>/health</code> and the static UI keep working. Full rollback: stop the <code>transcription</code>/<code>translation</code> containers, or redeploy the gateway from before this change.</p>
 
       <h3 class="sub">Monitoring</h3>
       <ul>
         <li><code>nvidia-smi</code> / DCGM exporter on the GPU host for VRAM and utilization</li>
-        <li>Docker healthchecks already wired to each service's <code>/health</code> and <code>/ready</code></li>
+        <li>Docker healthchecks already wired to each service's <code>/health</code> and <code>/ready</code> (mTLS-aware — <code>healthcheck.sh</code>)</li>
         <li>Alert on sustained <code>ai_service_error</code> / 503 rates in gateway logs (GPU saturation or a crashed model process)</li>
         <li>Track <code>transcription_completed.duration_ms</code> and <code>translation_completed.duration_ms</code> as separate latency series</li>
+        <li>Alert on internal mTLS cert expiry — <code>scripts/generate-internal-certs.sh</code> has no automated renewal (825-day default validity)</li>
       </ul>
+
+      <h3 class="sub">Performance targets (not yet measured — no production GPU access)</h3>
+      <div class="scroller">
+        <table>
+          <thead><tr><th>Scenario</th><th>Target</th></tr></thead>
+          <tbody>
+            <tr><td>Short sentence translation</td><td>95% within 5s</td></tr>
+            <tr><td>Medium paragraph translation</td><td>95% within 10s</td></tr>
+            <tr><td>Transcription</td><td>95% within an agreed multiple of audio duration</td></tr>
+            <tr><td>Concurrent users</td><td>Load-test at expected production concurrency once the real GPU is known</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>These are targets to benchmark against, not measured results — see the compliance note above. Full table in <code>docs/AI_FEATURE.md</code> §6.</p>
 
       <h3 class="sub">QA sample set (Urdu → English)</h3>
       <div class="scroller">
@@ -1125,7 +1172,7 @@ uvicorn app:app --host 0.0.0.0 --port 8002</code></pre>
           </tbody>
         </table>
       </div>
-      <p>Full 10-sample set and the manual QA checklist are in <code>docs/AI_FEATURE.md</code> §8 in the repository.</p>
+      <p>Full 10-sample set and the manual QA checklist (including the mTLS-enforcement checks) are in <code>docs/AI_FEATURE.md</code> §9 in the repository.</p>
     </section>
 
     <footer class="doc-footer">

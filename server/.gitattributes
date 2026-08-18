@@ -1,0 +1,6 @@
+# Shell scripts and Dockerfiles are executed/parsed by Linux containers
+# regardless of the developer's OS - force LF endings on checkout so a
+# Windows checkout (with core.autocrlf=true) can't silently turn a shebang
+# line into something the container's shell fails to execute.
+*.sh text eol=lf
+Dockerfile text eol=lf

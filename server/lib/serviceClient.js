@@ -1,3 +1,5 @@
+const fs = require("fs");
+const https = require("https");
 const axios = require("axios");
 const config = require("./config");
 
@@ -14,12 +16,41 @@ class AiServiceError extends Error {
     }
 }
 
+let cachedInternalHttpsAgent = null;
+
+// Builds the mutual-TLS agent used for every call to an internal AI service.
+// Deliberately fails fast (at startup, when routes first require this
+// module) rather than per-request if INTERNAL_TLS_ENABLED is on but
+// misconfigured - a silently-plaintext fallback would defeat the point of
+// requiring encryption in the first place.
+function getInternalHttpsAgent() {
+    if (!config.internalTlsEnabled) return undefined;
+    if (cachedInternalHttpsAgent) return cachedInternalHttpsAgent;
+
+    const { internalTlsClientCertFile, internalTlsClientKeyFile, internalTlsCaFile } = config;
+    if (!internalTlsClientCertFile || !internalTlsClientKeyFile || !internalTlsCaFile) {
+        throw new Error(
+            "INTERNAL_TLS_ENABLED=true requires INTERNAL_TLS_CLIENT_CERT_FILE, " +
+                "INTERNAL_TLS_CLIENT_KEY_FILE, and INTERNAL_TLS_CA_FILE to all be set"
+        );
+    }
+
+    cachedInternalHttpsAgent = new https.Agent({
+        cert: fs.readFileSync(internalTlsClientCertFile),
+        key: fs.readFileSync(internalTlsClientKeyFile),
+        ca: fs.readFileSync(internalTlsCaFile),
+        rejectUnauthorized: true,
+    });
+    return cachedInternalHttpsAgent;
+}
+
 function createServiceClient(baseURL, timeoutMs) {
     return axios.create({
         baseURL,
         timeout: timeoutMs,
         maxContentLength: 200 * 1024 * 1024,
         maxBodyLength: 200 * 1024 * 1024,
+        httpsAgent: getInternalHttpsAgent(),
         headers: config.internalServiceToken
             ? { Authorization: `Bearer ${config.internalServiceToken}` }
             : {},
@@ -75,4 +106,4 @@ async function callService({ client, req, method, url, data, axiosOpts, serviceL
     }
 }
 
-module.exports = { createServiceClient, callService, AiServiceError };
+module.exports = { createServiceClient, callService, AiServiceError, getInternalHttpsAgent };

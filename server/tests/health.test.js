@@ -39,3 +39,8 @@ test("GET /api/v1/ready reports not_ready when an AI service is unreachable", as
     expect(res.status).toBe(503);
     expect(res.body.status).toBe("not_ready");
 });
+
+test("the /speak (OpenAI TTS) route no longer exists - the app has zero external AI dependencies", async () => {
+    const res = await request(app).post("/speak").send({ text: "hello" });
+    expect(res.status).toBe(404);
+});

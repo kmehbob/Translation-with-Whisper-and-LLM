@@ -1,0 +1,23 @@
+# TLS-terminating reverse proxy for the public-facing side of the gateway.
+# Used by the `reverse-proxy` service in docker-compose.yml
+# (docker compose --profile proxy up -d).
+#
+# Set PUBLIC_DOMAIN to a real domain that already resolves (A/AAAA record)
+# to this host's public IP, and Caddy automatically obtains and renews a
+# Let's Encrypt certificate for it - no manual certbot/renewal cron needed.
+# Left at the default "localhost", Caddy instead serves its own
+# locally-trusted certificate, which is fine for internal/testing use but
+# will not be trusted by a real browser over the public internet.
+{$PUBLIC_DOMAIN:localhost} {
+	encode gzip
+
+	# Basic hardening at the edge; the app also sets its own security
+	# headers (see lib/config.js / helmet in serve.js) - this is defense in
+	# depth, not a replacement.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+	}
+
+	reverse_proxy gateway:3000
+}
