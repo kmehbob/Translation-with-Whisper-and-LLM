@@ -392,7 +392,6 @@ const copyEnglishBtn = document.getElementById("copyEnglishBtn");
 const saveAudioBtn = document.getElementById("saveAudioBtn");
 const translateBtn = document.getElementById("translateBtn");
 const translateBtnLabel = document.getElementById("translateBtnLabel");
-const translateStatus = document.getElementById("translateStatus");
 const translateError = document.getElementById("translateError");
 const translateErrorText = document.getElementById("translateErrorText");
 const staleNotice = document.getElementById("staleNotice");
@@ -892,7 +891,7 @@ function triggerTranslate() {
     updateTranslateButtonState();
     translateBtn.setAttribute("aria-busy", "true");
     translateBtnLabel.textContent = t("translatingBtn");
-    translateStatus.textContent = t("translatingStatus");
+    showToast(t("translatingStatus"));
     hideErrorBanner();
 
     fetch("/api/v1/translate", {
@@ -923,19 +922,17 @@ function triggerTranslate() {
                 staleNotice.classList.add("hidden");
                 copyEnglishBtn.disabled = !englishText.value.trim();
                 setExportButtonsEnabled(Boolean(currentRecordingId && englishText.value.trim()));
-                translateStatus.textContent = t("translationCompleteToast");
                 englishText.focus();
                 showToast(t("translationCompleteToast"), "success");
             } else {
                 markTranslationStale();
-                translateStatus.textContent = t("translationStaleAfterArrival");
+                showToast(t("translationStaleAfterArrival"));
             }
         })
         .catch(function (err) {
             logDebug("Translation error: " + err.message);
             lastFailedAction = { type: "translate" };
             showErrorBanner(t("translationErrorToast") + " " + err.message, err.requestId ? `requestId: ${err.requestId}\n${err.message}` : err.message);
-            translateStatus.textContent = "";
             showToast(t("translationErrorToast"), "error");
         })
         .finally(function () {
@@ -959,7 +956,6 @@ function resetWorkspaceState() {
     clearTranslationState();
     updateTranslateButtonState();
     hideErrorBanner();
-    translateStatus.textContent = "";
     setWorkspaceBusy(false);
 }
 
@@ -1365,7 +1361,7 @@ function runTranscription() {
     transcribeManualBtn.disabled = true;
     transcribeManualBtn.querySelector("span[data-i18n], span:not([aria-hidden])").textContent = t("transcribingBtn");
     setWorkspaceBusy(true);
-    translateStatus.textContent = t("transcribingStatus");
+    showToast(t("transcribingStatus"));
 
     if (currentFileItemEl) {
         currentFileItemEl.classList.remove("is-done", "is-error");
@@ -1391,14 +1387,12 @@ function runTranscription() {
             } else {
                 showToast(t("transcriptionCompleteToast"), "success");
             }
-            translateStatus.textContent = "";
         })
         .catch(function (error) {
             logDebug("Transcription error: " + error.message);
             lastFailedAction = { type: "transcribe" };
             showErrorBanner(t("transcriptionErrorToast") + " " + error.message, error.requestId ? `requestId: ${error.requestId}\nstatus: ${error.status}\n${error.message}` : error.message);
             setFileItemError(currentFileItemEl);
-            translateStatus.textContent = "";
             showToast(t("transcriptionErrorToast"), "error");
         })
         .finally(function () {

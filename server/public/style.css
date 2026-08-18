@@ -640,7 +640,7 @@ main { display: block; }
     .panel { display: flex; flex-direction: column; min-height: 0; }
     .panel textarea { flex: 1; min-height: 0; }
 
-    .action-row, #translateStatus, #translateError, .tech-details-toggle, .tech-details {
+    .action-row, #translateError, .tech-details-toggle, .tech-details {
         flex-shrink: 0;
     }
 }
