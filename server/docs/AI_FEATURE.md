@@ -43,6 +43,39 @@ explicitly rather than assumed:
   APIs, which would reopen the exact "no external AI provider" gap closed
   above. See §5 for GCP-specific deployment notes.
 
+### Frontend redesign & plain MP3 conversion endpoint
+
+A later round of UI feedback asked for a visual redesign and a couple of
+small functional gaps to be closed. Nothing here changes the AI/data-model
+contracts documented elsewhere in this file - it's presentation plus one
+new, deliberately AI-free utility route.
+
+- **Redesign.** `public/index.html`/`style.css`/`app.js` were rebuilt into a
+  compact, two-column ("Live" workspace + "History" dashboard) layout with:
+  a light/dark theme (warm ivory/dusty-sage/charcoal/muted-gold palette,
+  toggled via `public/theme-init.js` to avoid a flash of the wrong theme on
+  load, persisted in `localStorage`); a full English/Urdu interface-language
+  toggle for the chrome itself (separate from the source/target *content*
+  language pickers); a staged record/upload flow (a file is attached
+  locally and previewed before the user presses "Transcribe audio", instead
+  of auto-submitting); a real upload-progress bar (`XMLHttpRequest`, not
+  `fetch`, specifically to get `progress` events); and, on desktop, a fixed
+  one-viewport app shell where only the relevant inner region scrolls (the
+  record/upload cards in the Live tab, the results table in the History
+  tab) while headers/filters/pagination stay pinned in view. Below ~960px
+  width the app reverts to a normal, fully page-scrollable layout.
+- **`POST /api/v1/audio/mp3` (new, `routes/audioConvert.js`).** A plain
+  ffmpeg format-conversion utility: upload any supported audio format, get
+  an MP3 back. It reuses `lib/audioStorage.js`'s conversion function (now
+  parameterized with a destination directory) but deliberately does **not**
+  call the transcription/translation services and does **not** create a
+  `recordings` row - it exists so a user can save their raw recording as a
+  real MP3 immediately from the Live tab, without waiting on (or even
+  needing) the AI pipeline. Because it never touches an AI service, it is
+  mounted unconditionally and is *not* gated by `ENABLE_AI_FEATURES`. Both
+  the transient upload and the transient converted file are deleted after
+  the response streams, whether the request succeeds or fails.
+
 ## 1. Architecture
 
 ```
@@ -588,6 +621,11 @@ instrumentation work.
 - [ ] Open the History tab -> the just-created recording appears with correct metadata and status; search/filter by filename, source type, status, and date range each narrow the results correctly.
 - [ ] Open a history item's detail view -> audio plays back, transcription/translation are shown, and delete actually removes it (confirm it disappears from the list and a re-fetch 404s).
 - [ ] Set `RECORDINGS_RETENTION_DAYS=1`, manually backdate a test row's `created_at` in the DB, restart the gateway -> the row and its MP3 file are both gone after the prune runs.
+- [ ] Toggle the theme button -> switches light/dark immediately, no flash of the wrong theme on a page reload, and the choice persists across reloads.
+- [ ] Toggle the interface-language control (EN/UR) -> all chrome text (labels, buttons, headings) switches language; the transcription/translation content itself is unaffected (that's controlled separately by the source/target language pickers).
+- [ ] Record audio, then click the download icon on the staged file item *before* pressing "Transcribe audio" -> a real, playable MP3 downloads (via `/api/v1/audio/mp3`), with no transcription having run and no new row in the History tab.
+- [ ] On a desktop-width window, open the History tab with enough recordings to overflow one screen -> the header/stats/filters/pagination stay fixed in place and only the table of recordings scrolls (both directions on a narrow table, vertically for a long list); resize below ~960px and confirm the whole page scrolls normally instead.
+- [ ] On a phone-width window, open the History tab -> the recordings render as a card list (not a table), and it is actually visible (this regressed once already - see the file-history note below).
 
 ### Sample Urdu -> English evaluation set
 
@@ -609,7 +647,33 @@ specifically) that the model translated the sentence rather than obeying it.
 
 ## 10. Summary of changed/added files
 
-**Modified (this revision - history/multi-language/exports):**
+**Modified (latest revision - frontend redesign + MP3 conversion utility):**
+- `public/index.html`/`style.css`/`app.js` - see "Frontend redesign & plain
+  MP3 conversion endpoint" above for the full description (theme system,
+  bilingual interface, staged record/upload flow with real upload progress,
+  fixed one-viewport desktop shell with per-tab internal scrolling).
+- `lib/audioStorage.js` - `convertToMp3(sourcePath, destDir)` now takes an
+  optional destination directory (defaults to the permanent
+  `recordingsDir`, unchanged for every existing caller) so the new
+  conversion-only route can target a transient directory instead.
+- `serve.js` - mounts `routes/audioConvert.js` at `/api/v1/audio`,
+  unconditionally (not behind `ENABLE_AI_FEATURES` - it never calls an AI
+  service).
+
+**Added (latest revision):**
+- `routes/audioConvert.js` - `POST /api/v1/audio/mp3`, the plain
+  upload-then-convert-then-stream-back utility described above.
+- `public/theme-init.js` - tiny pre-paint script that applies the saved
+  light/dark theme before first render (kept as its own file because the
+  gateway's CSP has no `'unsafe-inline'` for `script-src`).
+- `public/favicon.svg` - the app's waveform-bars mark, reused as the
+  browser-tab icon.
+- `tests/audioConvert.test.js` - covers a successful conversion (streams
+  real bytes back, right `Content-Type`/`Content-Disposition`), confirms it
+  never creates a recording, rejects missing/unsupported uploads, and
+  cleans up both temp files on both the success and failure paths.
+
+**Modified (prior revision - history/multi-language/exports):**
 - `serve.js` - mounts `routes/recordings.js`; starts/schedules
   `pruneExpiredRecordings` (§3.2).
 - `routes/transcribe.js` - converts every upload to MP3 (`lib/audioStorage.js`),
@@ -647,7 +711,7 @@ specifically) that the model translated the sentence rather than obeying it.
   shutdown; the `/speak` (OpenAI TTS) route, its cache directory, and
   `OPENAI_API_KEY` were removed entirely; mTLS wiring throughout.
 
-**Added (Node gateway, this revision):**
+**Added (Node gateway, history/multi-language/exports revision):**
 - `lib/db.js` - SQLite connection + schema (`recordings` table).
 - `lib/recordingsRepo.js` - create/update/get/list (search+filter+paginate)/
   remove/pruneExpired.
@@ -673,7 +737,7 @@ specifically) that the model translated the sentence rather than obeying it.
 - `ai-services/transcription/` - `app.py`, `model_backend.py`, `config.py`
   (TLS + language settings), `concurrency.py`, `logging_utils.py`,
   `healthcheck.sh`, `requirements*.txt`, `Dockerfile`, `tests/` (incl.
-  `test_model_backend.py`, new this revision).
+  `test_model_backend.py`, added in the history/multi-language revision).
 - `ai-services/translation/` - `app.py`, `model_backend.py`, `prompt.py`
   (now builds a dynamic language-pair prompt), `chunker.py`, `config.py`
   (TLS settings), `concurrency.py`, `logging_utils.py`, `healthcheck.sh`,
@@ -686,6 +750,6 @@ specifically) that the model translated the sentence rather than obeying it.
 - `docs/AI_FEATURE.md` (this file)
 
 **Current test counts** (all run and passing in this environment, unlike
-GPU inference - see §7): **79 Node tests** (`npm test`), **55 Python tests**
+GPU inference - see §7): **85 Node tests** (`npm test`), **55 Python tests**
 (21 transcription + 34 translation, 2 more skipped by design pending real
 GPU access).
