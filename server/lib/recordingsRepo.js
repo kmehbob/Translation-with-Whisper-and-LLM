@@ -9,6 +9,16 @@ function nowIso() {
     return new Date().toISOString();
 }
 
+// `dateTo` typically arrives as a bare "YYYY-MM-DD" from an <input
+// type="date">, but created_at is a full ISO timestamp - compared as-is, a
+// bare date would exclude everything from that day except exact midnight.
+// Expanding it to the end of that day makes "to <today>" actually include
+// today, matching what a user picking that date expects.
+function endOfDayIso(dateTo) {
+    if (!dateTo) return dateTo;
+    return /^\d{4}-\d{2}-\d{2}$/.test(dateTo) ? `${dateTo}T23:59:59.999Z` : dateTo;
+}
+
 function create({ sourceType, originalFilename, storedFilename, mimeType, fileSizeBytes, sourceLanguage }) {
     const id = randomUUID();
     const ts = nowIso();
@@ -31,6 +41,8 @@ function update(id, fields) {
         "translation_text",
         "status",
         "error_message",
+        "original_filename",
+        "hidden",
     ];
     const setClauses = [];
     const params = { id, updatedAt: nowIso() };
@@ -53,13 +65,44 @@ function remove(id) {
     return result.changes > 0;
 }
 
+// The user-facing "delete" - marks a recording hidden so it drops out of
+// list() (and thus the History tab) without touching the DB row or the
+// audio file on disk. Real removal only ever happens via pruneExpired().
+function hide(id) {
+    return update(id, { hidden: 1 });
+}
+
+// Un-hides every recording created within [dateFrom, dateTo] (inclusive,
+// either end optional) - lets a user bring back what their own "delete"
+// only ever hid, scoped to a period they choose, without needing any kind
+// of admin/recovery tooling.
+function restoreHiddenByDateRange({ dateFrom, dateTo } = {}) {
+    const clauses = ["hidden = 1"];
+    const params = {};
+    if (dateFrom) {
+        clauses.push("created_at >= @dateFrom");
+        params.dateFrom = dateFrom;
+    }
+    if (dateTo) {
+        clauses.push("created_at <= @dateTo");
+        params.dateTo = endOfDayIso(dateTo);
+    }
+    const where = `WHERE ${clauses.join(" AND ")}`;
+    const ts = nowIso();
+    const result = db.prepare(`UPDATE recordings SET hidden = 0, updated_at = @ts ${where}`).run({ ...params, ts });
+    return result.changes;
+}
+
 // List with search/filter/pagination. `q` matches filename or transcription/
 // translation text (simple substring search - fine at this scale; a
 // dedicated search index would be overkill for a self-hosted history log).
-function list({ q, sourceType, status, dateFrom, dateTo, sort = "created_at", order = "desc", page = 1, pageSize = 20 } = {}) {
+function list({ q, sourceType, status, dateFrom, dateTo, includeHidden = false, sort = "created_at", order = "desc", page = 1, pageSize = 20 } = {}) {
     const clauses = [];
     const params = {};
 
+    if (!includeHidden) {
+        clauses.push("hidden = 0");
+    }
     if (q) {
         clauses.push(
             "(original_filename LIKE @q OR stored_filename LIKE @q OR transcription_text LIKE @q OR translation_text LIKE @q)"
@@ -80,7 +123,7 @@ function list({ q, sourceType, status, dateFrom, dateTo, sort = "created_at", or
     }
     if (dateTo) {
         clauses.push("created_at <= @dateTo");
-        params.dateTo = dateTo;
+        params.dateTo = endOfDayIso(dateTo);
     }
 
     const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
@@ -106,4 +149,4 @@ function pruneExpired(retentionDays) {
     return expired;
 }
 
-module.exports = { create, update, getById, remove, list, pruneExpired };
+module.exports = { create, update, getById, remove, hide, restoreHiddenByDateRange, list, pruneExpired };

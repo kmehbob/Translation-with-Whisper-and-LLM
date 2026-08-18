@@ -45,6 +45,19 @@ const UI_STRINGS = {
         removeFileAria: "Remove",
         mp3ConvertFailed: "Could not convert this recording to MP3.",
         mp3DownloadError: "MP3 download failed: {msg}",
+        renameAudioAria: "Rename",
+        modalCancel: "Cancel",
+        modalConfirm: "OK",
+        modalConfirmTitle: "Confirm",
+        modalDeleteTitle: "Delete recording",
+        modalDeleteConfirm: "Delete",
+        renamePrompt: "Rename this recording",
+        renameSuccess: "Recording renamed.",
+        renameError: "Could not rename: {msg}",
+        restoreForPeriod: "Restore deleted for this period",
+        restoreSuccess: "{n} recording(s) restored.",
+        restoreNone: "No deleted recordings found in that period.",
+        restoreError: "Could not restore: {msg}",
         sourceLabel: "Source language",
         targetLabel: "Target language",
         transcribeBtn: "Transcribe audio",
@@ -176,6 +189,19 @@ const UI_STRINGS = {
         removeFileAria: "ہٹا دیں",
         mp3ConvertFailed: "اس ریکارڈنگ کو MP3 میں تبدیل نہیں کیا جا سکا۔",
         mp3DownloadError: "MP3 ڈاؤن لوڈ ناکام: {msg}",
+        renameAudioAria: "نام تبدیل کریں",
+        modalCancel: "منسوخ کریں",
+        modalConfirm: "ٹھیک ہے",
+        modalConfirmTitle: "تصدیق کریں",
+        modalDeleteTitle: "ریکارڈنگ حذف کریں",
+        modalDeleteConfirm: "حذف کریں",
+        renamePrompt: "اس ریکارڈنگ کا نام تبدیل کریں",
+        renameSuccess: "ریکارڈنگ کا نام تبدیل کر دیا گیا۔",
+        renameError: "نام تبدیل نہیں ہو سکا: {msg}",
+        restoreForPeriod: "اس مدت کی حذف شدہ ریکارڈنگز بحال کریں",
+        restoreSuccess: "{n} ریکارڈنگز بحال کر دی گئیں۔",
+        restoreNone: "اس مدت میں کوئی حذف شدہ ریکارڈنگ نہیں ملی۔",
+        restoreError: "بحال نہیں ہو سکا: {msg}",
         sourceLabel: "ماخذ زبان",
         targetLabel: "ہدف زبان",
         transcribeBtn: "آڈیو ٹرانسکرائب کریں",
@@ -481,6 +507,106 @@ function showToast(message, type) {
     toast.setAttribute("role", type === "error" ? "alert" : "status");
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 4500);
+}
+
+// ============================================================================
+// Modal dialogs (replaces native window.confirm/window.prompt)
+// ============================================================================
+const appModalOverlay = document.getElementById("appModalOverlay");
+const appModal = document.getElementById("appModal");
+const appModalTitle = document.getElementById("appModalTitle");
+const appModalMessage = document.getElementById("appModalMessage");
+const appModalInputWrap = document.getElementById("appModalInputWrap");
+const appModalInput = document.getElementById("appModalInput");
+const appModalInputLabel = document.getElementById("appModalInputLabel");
+const appModalCancelBtn = document.getElementById("appModalCancelBtn");
+const appModalConfirmBtn = document.getElementById("appModalConfirmBtn");
+
+let activeModalResolve = null;
+let modalPreviousFocus = null;
+
+function openModal({ title, message, danger = false, showInput = false, inputValue = "", confirmLabel, cancelLabel }) {
+    return new Promise((resolve) => {
+        activeModalResolve = resolve;
+        modalPreviousFocus = document.activeElement;
+
+        appModalTitle.textContent = title || "";
+        appModalMessage.textContent = message || "";
+        appModal.classList.toggle("is-danger", !!danger);
+        appModalInputWrap.classList.toggle("hidden", !showInput);
+        appModalInput.value = showInput ? inputValue || "" : "";
+        appModalConfirmBtn.textContent = confirmLabel || t("modalConfirm");
+        appModalCancelBtn.textContent = cancelLabel || t("modalCancel");
+
+        appModalOverlay.classList.remove("hidden");
+        document.addEventListener("keydown", handleModalKeydown, true);
+
+        if (showInput) {
+            appModalInput.focus();
+            appModalInput.select();
+        } else {
+            appModalConfirmBtn.focus();
+        }
+    });
+}
+
+function closeModal(result) {
+    appModalOverlay.classList.add("hidden");
+    document.removeEventListener("keydown", handleModalKeydown, true);
+    const resolve = activeModalResolve;
+    activeModalResolve = null;
+    if (modalPreviousFocus && typeof modalPreviousFocus.focus === "function") {
+        modalPreviousFocus.focus();
+    }
+    modalPreviousFocus = null;
+    if (resolve) resolve(result);
+}
+
+function handleModalKeydown(event) {
+    if (event.key === "Escape") {
+        event.preventDefault();
+        closeModal(appModalInputWrap.classList.contains("hidden") ? false : null);
+    } else if (event.key === "Enter" && document.activeElement !== appModalCancelBtn) {
+        event.preventDefault();
+        appModalConfirmBtn.click();
+    }
+}
+
+appModalCancelBtn.addEventListener("click", () => {
+    closeModal(appModalInputWrap.classList.contains("hidden") ? false : null);
+});
+appModalConfirmBtn.addEventListener("click", () => {
+    if (!appModalInputWrap.classList.contains("hidden")) {
+        closeModal(appModalInput.value);
+    } else {
+        closeModal(true);
+    }
+});
+appModalOverlay.addEventListener("click", (event) => {
+    if (event.target === appModalOverlay) {
+        closeModal(appModalInputWrap.classList.contains("hidden") ? false : null);
+    }
+});
+
+function confirmDialog(message, { title, danger = false, confirmLabel, cancelLabel } = {}) {
+    return openModal({
+        title: title || t("modalConfirmTitle"),
+        message,
+        danger,
+        showInput: false,
+        confirmLabel,
+        cancelLabel,
+    }).then((result) => result === true);
+}
+
+function promptDialog(message, defaultValue = "", { title, label } = {}) {
+    appModalInputLabel.textContent = label || message || "";
+    return openModal({
+        title: title || t("modalConfirmTitle"),
+        message,
+        showInput: true,
+        inputValue: defaultValue,
+    }).then((result) => (typeof result === "string" ? result : null));
 }
 
 // ============================================================================
@@ -1562,7 +1688,6 @@ const historySourceType = document.getElementById("historySourceType");
 const historyStatusFilter = document.getElementById("historyStatus");
 const historyDateFrom = document.getElementById("historyDateFrom");
 const historyDateTo = document.getElementById("historyDateTo");
-const historyStatusText = document.getElementById("historyStatus2");
 const historyTable = document.getElementById("historyTable");
 const historyTableBody = document.getElementById("historyTableBody");
 const historyCardList = document.getElementById("historyCardList");
@@ -1573,6 +1698,7 @@ const historyPageInfo = document.getElementById("historyPageInfo");
 const historyPageNumbers = document.getElementById("historyPageNumbers");
 const historyDetailOverlay = document.getElementById("historyDetailOverlay");
 const historyDetailClose = document.getElementById("historyDetailClose");
+const historyDetailRenameBtn = document.getElementById("historyDetailRenameBtn");
 const historyAudioPlayer = document.getElementById("historyAudioPlayer");
 const historyTranscriptionText = document.getElementById("historyTranscriptionText");
 const historyTranslationText = document.getElementById("historyTranslationText");
@@ -1582,6 +1708,7 @@ const filtersCollapse = document.getElementById("filtersCollapse");
 const filtersBadge = document.getElementById("filtersBadge");
 const filtersCount = document.getElementById("filtersCount");
 const historyClearBtn = document.getElementById("historyClearBtn");
+const historyRestoreBtn = document.getElementById("historyRestoreBtn");
 const exportHistoryBtn = document.getElementById("exportHistoryBtn");
 const historySelectAllCheckbox = document.getElementById("historySelectAllCheckbox");
 const historyBulkBar = document.getElementById("historyBulkBar");
@@ -1632,23 +1759,27 @@ historyBulkClearBtn.addEventListener("click", () => {
 historyBulkDeleteBtn.addEventListener("click", () => {
     const ids = [...selectedRecordingIds];
     if (ids.length === 0) return;
-    if (!window.confirm(t("bulkDeleteConfirm", { n: ids.length }))) return;
 
-    Promise.allSettled(ids.map((id) => fetch(`/api/v1/recordings/${id}`, { method: "DELETE" })
-        .then((res) => {
-            if (!res.ok && res.status !== 204) throw new Error("Delete failed");
-        })))
-        .then((results) => {
-            const failed = results.filter((r) => r.status === "rejected").length;
-            const succeeded = results.length - failed;
-            selectedRecordingIds.clear();
-            if (failed === 0) {
-                showToast(t("bulkDeleteSuccess", { n: succeeded }), "success");
-            } else {
-                showToast(t("bulkDeletePartial", { succeeded, failed }), "error");
-            }
-            loadHistory();
-            loadStats();
+    confirmDialog(t("bulkDeleteConfirm", { n: ids.length }), { title: t("modalDeleteTitle"), danger: true, confirmLabel: t("modalDeleteConfirm") })
+        .then((ok) => {
+            if (!ok) return;
+
+            return Promise.allSettled(ids.map((id) => fetch(`/api/v1/recordings/${id}`, { method: "DELETE" })
+                .then((res) => {
+                    if (!res.ok && res.status !== 204) throw new Error("Delete failed");
+                })))
+                .then((results) => {
+                    const failed = results.filter((r) => r.status === "rejected").length;
+                    const succeeded = results.length - failed;
+                    selectedRecordingIds.clear();
+                    if (failed === 0) {
+                        showToast(t("bulkDeleteSuccess", { n: succeeded }), "success");
+                    } else {
+                        showToast(t("bulkDeletePartial", { succeeded, failed }), "error");
+                    }
+                    loadHistory();
+                    loadStats();
+                });
         });
 });
 
@@ -1696,7 +1827,6 @@ function currentFilterParams(extra) {
 }
 
 function loadHistory() {
-    historyStatusText.textContent = t("historyLoading");
     updateFiltersBadge();
     const params = currentFilterParams({ page: historyPage, pageSize: historyPageSize });
 
@@ -1707,7 +1837,6 @@ function loadHistory() {
         }))
         .then((data) => renderHistory(data))
         .catch((err) => {
-            historyStatusText.textContent = "";
             showToast(t("historyLoadError", { msg: err.message }), "error");
         });
 }
@@ -1732,6 +1861,32 @@ function loadStats() {
 
 const PLAY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>';
 const TRASH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+const EDIT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>';
+
+// Renames only ever touch the display name shown to the user
+// (originalFilename server-side) - never the stored audio file itself.
+function renameRecording(id, currentName) {
+    promptDialog(t("renamePrompt"), currentName || "").then((proposed) => {
+        if (proposed == null) return; // cancelled
+        const nextName = proposed.trim();
+        if (!nextName || nextName === currentName) return;
+
+        fetch(`/api/v1/recordings/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ originalFilename: nextName }),
+        })
+            .then((res) => res.json().then((data) => {
+                if (!res.ok) throw new Error(data.error || "Rename failed");
+                return data;
+            }))
+            .then(() => {
+                showToast(t("renameSuccess"), "success");
+                loadHistory();
+            })
+            .catch((err) => showToast(t("renameError", { msg: err.message }), "error"));
+    });
+}
 const FILE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
 const STATUS_ICONS = {
     completed: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
@@ -1750,7 +1905,6 @@ function formatLanguagesCell(item) {
 }
 
 function renderHistory(data) {
-    historyStatusText.textContent = "";
     historyTableBody.innerHTML = "";
     historyCardList.innerHTML = "";
     selectedRecordingIds.clear();
@@ -1832,6 +1986,7 @@ function buildTableRow(item) {
         <td>
             <div class="row-actions">
                 <button type="button" class="icon-btn row-play-btn" aria-label="Open">${PLAY_ICON}</button>
+                <button type="button" class="icon-btn row-rename-btn" aria-label="${t("renameAudioAria")}">${EDIT_ICON}</button>
                 <button type="button" class="icon-btn row-download-btn" aria-label="${t("downloadAudioAria")}">${DOWNLOAD_ICON}</button>
                 <button type="button" class="icon-btn row-delete-btn" aria-label="Delete">${TRASH_ICON}</button>
             </div>
@@ -1843,6 +1998,7 @@ function buildTableRow(item) {
     tr.querySelector(".row-checkbox").addEventListener("click", (e) => e.stopPropagation());
     tr.querySelector(".row-checkbox").addEventListener("change", (e) => toggleRowSelection(item.id, e.target.checked));
     tr.querySelector(".row-play-btn").addEventListener("click", (e) => { e.stopPropagation(); openHistoryDetail(item.id); });
+    tr.querySelector(".row-rename-btn").addEventListener("click", (e) => { e.stopPropagation(); renameRecording(item.id, name); });
     tr.querySelector(".row-download-btn").addEventListener("click", (e) => { e.stopPropagation(); downloadRecordingAudio(item.id, item.originalFilename); });
     tr.querySelector(".row-delete-btn").addEventListener("click", (e) => { e.stopPropagation(); quickDelete(item.id); });
     return tr;
@@ -1862,6 +2018,7 @@ function buildCard(item) {
             </div>
             <div class="row-actions">
                 <button type="button" class="icon-btn row-play-btn" aria-label="Open">${PLAY_ICON}</button>
+                <button type="button" class="icon-btn row-rename-btn" aria-label="${t("renameAudioAria")}">${EDIT_ICON}</button>
                 <button type="button" class="icon-btn row-download-btn" aria-label="${t("downloadAudioAria")}">${DOWNLOAD_ICON}</button>
                 <button type="button" class="icon-btn row-delete-btn" aria-label="Delete">${TRASH_ICON}</button>
             </div>
@@ -1875,7 +2032,7 @@ function buildCard(item) {
             <span class="sep">•</span>
             <span>${formatLanguagesCell(item)}</span>
             <span class="sep">•</span>
-            <span>${new Date(item.createdAt).toLocaleDateString()}</span>
+            <span>${new Date(item.createdAt).toLocaleString()}</span>
         </div>
     `;
     card.querySelector(".history-item-name").textContent = name;
@@ -1883,21 +2040,24 @@ function buildCard(item) {
     card.querySelector(".card-checkbox").addEventListener("click", (e) => e.stopPropagation());
     card.querySelector(".card-checkbox").addEventListener("change", (e) => toggleRowSelection(item.id, e.target.checked));
     card.querySelector(".row-play-btn").addEventListener("click", (e) => { e.stopPropagation(); openHistoryDetail(item.id); });
+    card.querySelector(".row-rename-btn").addEventListener("click", (e) => { e.stopPropagation(); renameRecording(item.id, name); });
     card.querySelector(".row-download-btn").addEventListener("click", (e) => { e.stopPropagation(); downloadRecordingAudio(item.id, item.originalFilename); });
     card.querySelector(".row-delete-btn").addEventListener("click", (e) => { e.stopPropagation(); quickDelete(item.id); });
     return card;
 }
 
 function quickDelete(id) {
-    if (!window.confirm(t("deleteConfirm"))) return;
-    fetch(`/api/v1/recordings/${id}`, { method: "DELETE" })
-        .then((res) => {
-            if (!res.ok && res.status !== 204) throw new Error("Delete failed");
-            showToast(t("deletedToast"), "success");
-            loadHistory();
-            loadStats();
-        })
-        .catch((err) => showToast(t("deleteError", { msg: err.message }), "error"));
+    confirmDialog(t("deleteConfirm"), { title: t("modalDeleteTitle"), danger: true, confirmLabel: t("modalDeleteConfirm") }).then((ok) => {
+        if (!ok) return;
+        fetch(`/api/v1/recordings/${id}`, { method: "DELETE" })
+            .then((res) => {
+                if (!res.ok && res.status !== 204) throw new Error("Delete failed");
+                showToast(t("deletedToast"), "success");
+                loadHistory();
+                loadStats();
+            })
+            .catch((err) => showToast(t("deleteError", { msg: err.message }), "error"));
+    });
 }
 
 historyFiltersForm.addEventListener("submit", (e) => {
@@ -1916,10 +2076,39 @@ historyClearBtn.addEventListener("click", () => {
     loadHistory();
     loadStats();
 });
+
+// "Deleting" a recording only ever hides it server-side - it's never
+// actually removed. This brings back everything hidden within the
+// currently-selected date range (an empty from/to means "any time").
+historyRestoreBtn.addEventListener("click", () => {
+    const dateFrom = historyDateFrom.value || undefined;
+    const dateTo = historyDateTo.value || undefined;
+
+    fetch("/api/v1/recordings/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dateFrom, dateTo }),
+    })
+        .then((res) => res.json().then((data) => {
+            if (!res.ok) throw new Error(data.error || "Restore failed");
+            return data;
+        }))
+        .then((data) => {
+            if (data.restored > 0) {
+                showToast(t("restoreSuccess", { n: data.restored }), "success");
+                loadHistory();
+                loadStats();
+            } else {
+                showToast(t("restoreNone"));
+            }
+        })
+        .catch((err) => showToast(t("restoreError", { msg: err.message }), "error"));
+});
 historyPrevBtn.addEventListener("click", () => { historyPage = Math.max(1, historyPage - 1); loadHistory(); });
 historyNextBtn.addEventListener("click", () => { historyPage += 1; loadHistory(); });
 
 let openRecordingId = null;
+let openRecordingName = "";
 
 function openHistoryDetail(id) {
     fetch(`/api/v1/recordings/${id}`)
@@ -1929,6 +2118,7 @@ function openHistoryDetail(id) {
         }))
         .then((rec) => {
             openRecordingId = rec.id;
+            openRecordingName = rec.originalFilename ? toMp3DisplayName(rec.originalFilename) : t("untitled");
             historyAudioPlayer.src = `/api/v1/recordings/${rec.id}/audio`;
             historyTranscriptionText.value = rec.transcriptionText || "";
             historyTranslationText.value = rec.translationText || "";
@@ -1942,7 +2132,13 @@ function closeHistoryDetail() {
     historyAudioPlayer.pause();
     historyAudioPlayer.src = "";
     openRecordingId = null;
+    openRecordingName = "";
 }
+
+historyDetailRenameBtn.addEventListener("click", () => {
+    if (!openRecordingId) return;
+    renameRecording(openRecordingId, openRecordingName);
+});
 
 historyDetailClose.addEventListener("click", closeHistoryDetail);
 historyDetailOverlay.addEventListener("click", (e) => {
@@ -1955,17 +2151,19 @@ wireDropdown("historyExportDropdown", "historyExportToggleBtn", "historyExportMe
 
 historyDeleteBtn.addEventListener("click", () => {
     if (!openRecordingId) return;
-    if (!window.confirm(t("deleteConfirm"))) return;
+    confirmDialog(t("deleteConfirm"), { title: t("modalDeleteTitle"), danger: true, confirmLabel: t("modalDeleteConfirm") }).then((ok) => {
+        if (!ok) return;
 
-    fetch(`/api/v1/recordings/${openRecordingId}`, { method: "DELETE" })
-        .then((res) => {
-            if (!res.ok && res.status !== 204) throw new Error("Delete failed");
-            showToast(t("deletedToast"), "success");
-            closeHistoryDetail();
-            loadHistory();
-            loadStats();
-        })
-        .catch((err) => showToast(t("deleteError", { msg: err.message }), "error"));
+        fetch(`/api/v1/recordings/${openRecordingId}`, { method: "DELETE" })
+            .then((res) => {
+                if (!res.ok && res.status !== 204) throw new Error("Delete failed");
+                showToast(t("deletedToast"), "success");
+                closeHistoryDetail();
+                loadHistory();
+                loadStats();
+            })
+            .catch((err) => showToast(t("deleteError", { msg: err.message }), "error"));
+    });
 });
 
 // Export the currently filtered history as a CSV (client-side; no server

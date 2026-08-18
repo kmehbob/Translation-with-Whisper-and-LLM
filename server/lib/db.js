@@ -39,4 +39,17 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_recordings_source_type ON recordings(source_type);
 `);
 
+// Migration: `hidden` was added after the table above already shipped, so
+// existing databases need it bolted on - `CREATE TABLE IF NOT EXISTS` alone
+// only affects brand-new databases. This is a soft-delete flag: "deleting" a
+// recording from the user-facing History tab only ever sets hidden = 1, it
+// never removes the row or its audio file from the server (see
+// routes/recordings.js) - only RECORDINGS_RETENTION_DAYS expiry actually
+// deletes anything.
+const hasHiddenColumn = db.prepare("PRAGMA table_info(recordings)").all().some((col) => col.name === "hidden");
+if (!hasHiddenColumn) {
+    db.exec("ALTER TABLE recordings ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0");
+}
+db.exec("CREATE INDEX IF NOT EXISTS idx_recordings_hidden ON recordings(hidden)");
+
 module.exports = db;

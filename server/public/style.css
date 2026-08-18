@@ -228,23 +228,62 @@ main { display: block; }
 @media (max-width: 767.98px) {
     .site-header {
         flex-direction: column;
-        align-items: center;
+        align-items: stretch;
         justify-content: center;
         text-align: center;
+        gap: 8px;
+        padding: 8px 0 6px;
     }
 
-    .brand { justify-content: center; }
+    /* Compact brand: smaller mark, tighter type, single-line subtitle. */
+    .brand { justify-content: center; gap: 8px; }
+    .brand-icon { width: 28px; height: 28px; }
+    .brand-icon svg { width: 16px; height: 16px; }
+    .brand-text h1 { font-size: 14px; }
+    .brand-sub { font-size: 10.5px; margin-top: 0; }
 
+    .view-tabs-wrap { display: flex; justify-content: center; width: 100%; }
+    .view-tabs { margin: 0 auto; }
+
+    /* Controls: keep everything on as few lines as possible. The language
+       caption is purely decorative (the EN/اردو buttons speak for
+       themselves) and the mic badge's status text is the same information
+       already shown by its color/icon, so both collapse to icon-only here -
+       their text stays screen-reader-accessible via .sr-only rather than
+       being removed outright. */
     .header-controls {
         justify-content: center;
         width: 100%;
+        gap: 8px;
     }
 
-    .lang-toggle-group { justify-content: center; }
+    .lang-toggle-group { justify-content: center; gap: 6px; }
 
-    .view-tabs-wrap { display: flex; justify-content: center; width: 100%; }
+    .control-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
 
-    .view-tabs { margin: 0 auto; }
+    #micBadgeText {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    #micBadge { padding: 6px 8px; gap: 4px; }
 }
 
 .control-label {
@@ -652,7 +691,6 @@ main { display: block; }
     .history-head,
     .stats-row,
     #historyFilters,
-    #historyStatus2,
     #historyEmpty,
     .pagination-row {
         flex-shrink: 0;
@@ -1398,6 +1436,44 @@ main { display: block; }
     box-shadow: var(--shadow-lg);
 }
 
+/* Generic confirm/prompt dialog - sits above everything else, including the
+   history detail overlay (renaming can be triggered from within it). */
+#appModalOverlay {
+    align-items: center;
+    z-index: 200;
+}
+
+.app-modal {
+    width: 100%;
+    max-width: 420px;
+    box-shadow: var(--shadow-lg);
+    animation: banner-in 0.18s ease;
+}
+
+.app-modal h2 { font-size: 16px; margin-bottom: 8px; }
+
+.app-modal .muted-sub { margin-bottom: 14px; line-height: 1.5; }
+
+#appModalInputWrap { margin-bottom: 16px; }
+
+#appModalInput {
+    width: 100%;
+    font-size: 14px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface-alt);
+    color: var(--text);
+}
+
+.app-modal-actions { justify-content: flex-end; margin: 0; }
+
+.app-modal.is-danger #appModalConfirmBtn {
+    background: var(--danger);
+    color: #fff;
+}
+.app-modal.is-danger #appModalConfirmBtn:hover { background: var(--danger); opacity: 0.9; }
+
 .outputs-grid {
     display: flex;
     flex-direction: column;
@@ -1464,7 +1540,7 @@ main { display: block; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .toast, .banner, .btn, .drop-zone, .mic-circle-btn, .status-dot, .spinner, .dropdown-chevron, .tech-details-toggle svg {
+    .toast, .banner, .app-modal, .btn, .drop-zone, .mic-circle-btn, .status-dot, .spinner, .dropdown-chevron, .tech-details-toggle svg {
         animation: none !important;
         transition: none !important;
     }

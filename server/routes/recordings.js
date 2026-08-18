@@ -171,14 +171,23 @@ router.post(
     }
 );
 
+// A hidden (user-"deleted") recording is treated as gone for every
+// single-item lookup too, not just the list - otherwise "deleting" it
+// wouldn't actually stop it being viewed/played/exported/renamed by anyone
+// who still had (or guessed) its id.
+function getVisibleById(id) {
+    const recording = recordingsRepo.getById(id);
+    return recording && !recording.hidden ? recording : null;
+}
+
 router.get("/:id", (req, res) => {
-    const recording = recordingsRepo.getById(req.params.id);
+    const recording = getVisibleById(req.params.id);
     if (!recording) return res.status(404).json({ error: "Recording not found", requestId: req.id });
     res.json(toPublicShape(recording));
 });
 
 router.get("/:id/audio", (req, res) => {
-    const recording = recordingsRepo.getById(req.params.id);
+    const recording = getVisibleById(req.params.id);
     if (!recording) return res.status(404).json({ error: "Recording not found", requestId: req.id });
 
     const filePath = audioStorage.storedFilePath(recording.stored_filename);
@@ -196,7 +205,7 @@ router.get("/:id/export", async (req, res, next) => {
         return res.status(400).json({ error: `Unsupported export format. Use one of: ${SUPPORTED_FORMATS.join(", ")}`, requestId: req.id });
     }
 
-    const recording = recordingsRepo.getById(req.params.id);
+    const recording = getVisibleById(req.params.id);
     if (!recording) return res.status(404).json({ error: "Recording not found", requestId: req.id });
     if (!recording.transcription_text && !recording.translation_text) {
         return res.status(409).json({ error: "Nothing to export yet for this recording", requestId: req.id });
@@ -213,18 +222,48 @@ router.get("/:id/export", async (req, res, next) => {
     }
 });
 
-router.delete("/:id", async (req, res, next) => {
-    try {
-        const recording = recordingsRepo.getById(req.params.id);
-        if (!recording) return res.status(404).json({ error: "Recording not found", requestId: req.id });
+// Renaming only ever touches the display name (original_filename) - never
+// the on-disk stored_filename - so there is no path-traversal surface here
+// regardless of what the user types.
+router.patch("/:id", (req, res) => {
+    const recording = getVisibleById(req.params.id);
+    if (!recording) return res.status(404).json({ error: "Recording not found", requestId: req.id });
 
-        await audioStorage.deleteStoredFile(recording.stored_filename);
-        recordingsRepo.remove(req.params.id);
-        logger.info("recording_deleted", { requestId: req.id, recordingId: req.params.id });
-        res.status(204).end();
-    } catch (err) {
-        next(err);
+    const nextName = typeof req.body.originalFilename === "string" ? req.body.originalFilename.trim() : "";
+    if (!nextName) {
+        return res.status(400).json({ error: "originalFilename is required", requestId: req.id });
     }
+    if (nextName.length > 255) {
+        return res.status(400).json({ error: "originalFilename is too long (255 characters max)", requestId: req.id });
+    }
+
+    const updated = recordingsRepo.update(req.params.id, { original_filename: nextName });
+    logger.info("recording_renamed", { requestId: req.id, recordingId: req.params.id });
+    res.json(toPublicShape(updated));
+});
+
+// The user-facing "delete": hides the recording from the History tab (see
+// recordingsRepo.list()'s default hidden = 0 filter) without deleting the
+// database row or the audio file - users can never trigger a real deletion
+// of server-side data this way. Only RECORDINGS_RETENTION_DAYS expiry
+// (serve.js's pruneExpiredRecordings) actually removes anything.
+router.delete("/:id", (req, res) => {
+    const recording = getVisibleById(req.params.id);
+    if (!recording) return res.status(404).json({ error: "Recording not found", requestId: req.id });
+
+    recordingsRepo.hide(req.params.id);
+    logger.info("recording_hidden", { requestId: req.id, recordingId: req.params.id });
+    res.status(204).end();
+});
+
+// Brings back everything the user has "deleted" (i.e. hidden) within a
+// chosen period - the data was never actually removed from the server, so
+// this is a plain un-hide, not a recovery/undelete operation.
+router.post("/restore", (req, res) => {
+    const { dateFrom, dateTo } = req.body || {};
+    const restored = recordingsRepo.restoreHiddenByDateRange({ dateFrom, dateTo });
+    logger.info("recordings_restored", { requestId: req.id, restored });
+    res.json({ restored });
 });
 
 module.exports = router;
