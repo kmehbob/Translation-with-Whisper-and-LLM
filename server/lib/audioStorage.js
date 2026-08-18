@@ -12,13 +12,15 @@ ffmpeg.setFfprobePath(ffprobePath);
 const recordingsDir = config.recordingsDir || path.join(__dirname, "..", "recordings");
 fs.mkdirSync(recordingsDir, { recursive: true });
 
-// Converts any supported input audio format to MP3 (the format recordings
-// are stored in, per spec) and returns the permanent path + metadata. The
-// source file is left untouched - callers decide whether to delete it.
-function convertToMp3(sourcePath) {
+// Converts any supported input audio format to MP3 and returns the output
+// path + metadata. The source file is left untouched - callers decide
+// whether to delete it. Writes into recordingsDir (permanent storage) by
+// default; callers that only need a throwaway MP3 (e.g. a plain
+// convert-and-download utility) can pass a different, transient destDir.
+function convertToMp3(sourcePath, destDir = recordingsDir) {
     return new Promise((resolve, reject) => {
         const storedFilename = `${randomUUID()}.mp3`;
-        const destPath = path.join(recordingsDir, storedFilename);
+        const destPath = path.join(destDir, storedFilename);
 
         ffmpeg(sourcePath)
             .audioCodec("libmp3lame")

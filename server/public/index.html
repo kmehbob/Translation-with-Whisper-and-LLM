@@ -1,224 +1,438 @@
-
 <!DOCTYPE html>
-<html lang="ur">
+<html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>آڈیو ٹرانسکرپشن اور ترجمہ</title>
+    <title>Audio Transcription &amp; Translation</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <script src="theme-init.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header class="app-header">
-        <h1>آڈیو ٹرانسکرپشن اور ترجمہ</h1>
-        <nav class="tabs" role="tablist" aria-label="اہم حصے">
-            <button type="button" class="tab active" id="tabBtnCreate" role="tab" aria-selected="true" aria-controls="tabCreate">🎙️ نیا</button>
-            <button type="button" class="tab" id="tabBtnHistory" role="tab" aria-selected="false" aria-controls="tabHistory">🕘 ہسٹری</button>
+<div class="app-shell">
+
+    <header class="site-header">
+        <div class="brand">
+            <span class="brand-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="10" x2="4" y2="14"/><line x1="8" y1="6" x2="8" y2="18"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="16" y1="6" x2="16" y2="18"/><line x1="20" y1="10" x2="20" y2="14"/></svg>
+            </span>
+            <div class="brand-text">
+                <h1 data-i18n="appTitle">Audio Transcription &amp; Translation</h1>
+                <p class="brand-sub">آڈیو ٹرانسکرپشن اور ترجمہ</p>
+            </div>
+        </div>
+
+        <nav class="view-tabs-wrap">
+            <div class="view-tabs" role="tablist" aria-label="Sections">
+                <button type="button" class="active" id="tabBtnCreate" role="tab" aria-selected="true" aria-controls="tabCreate">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49M7.76 16.24a6 6 0 0 1 0-8.49M19.07 4.93a10 10 0 0 1 0 14.14M4.93 19.07a10 10 0 0 1 0-14.14"/></svg>
+                    <span data-i18n="tabLive">Live</span>
+                </button>
+                <button type="button" id="tabBtnHistory" role="tab" aria-selected="false" aria-controls="tabHistory">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+                    <span data-i18n="tabHistory">History</span>
+                </button>
+            </div>
         </nav>
+
+        <div class="header-controls">
+            <div class="lang-toggle-group">
+                <span class="control-label">Interface language / انٹرفیس زبان</span>
+                <div class="segmented" role="group" aria-label="Interface language">
+                    <button type="button" id="uiLangEnBtn" class="active" aria-pressed="true">English</button>
+                    <button type="button" id="uiLangUrBtn" aria-pressed="false">اردو</button>
+                </div>
+            </div>
+
+            <span class="badge neutral" id="micBadge">
+                <svg id="micBadgeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="11"/><line x1="12" y1="8" x2="12" y2="8"/></svg>
+                <span id="micBadgeText" data-i18n="micNotAllowed">Microphone access: Not allowed</span>
+                <button type="button" class="icon-btn-tiny" id="micInfoBtn" aria-label="About microphone access">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="11"/><line x1="12" y1="8" x2="12" y2="8"/></svg>
+                </button>
+            </span>
+
+            <button type="button" class="icon-btn" id="themeToggleBtn" aria-label="Toggle dark mode">
+                <span id="themeIconSun" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.2" y1="4.2" x2="5.6" y2="5.6"/><line x1="18.4" y1="18.4" x2="19.8" y2="19.8"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.2" y1="19.8" x2="5.6" y2="18.4"/><line x1="18.4" y1="5.6" x2="19.8" y2="4.2"/></svg>
+                </span>
+                <span id="themeIconMoon" class="hidden" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.5A9 9 0 1 1 11.5 3a7 7 0 0 0 9.5 9.5z"/></svg>
+                </span>
+            </button>
+        </div>
     </header>
 
     <main>
-    <!-- ==================== CREATE TAB ==================== -->
-    <div id="tabCreate" class="tab-panel" role="tabpanel" aria-labelledby="tabBtnCreate">
+    <!-- ==================== LIVE TAB ==================== -->
+    <section id="tabCreate" class="tab-panel" role="tabpanel" aria-labelledby="tabBtnCreate">
 
-        <!-- Mic permission gate -->
-        <div id="step1" class="container">
-            <h2>مائیکروفون کی اجازت</h2>
-            <p>ریکارڈنگ کے لیے مائیکروفون کی اجازت درکار ہے۔ آپ اجازت کے بغیر بھی فائل اپ لوڈ کر سکتے ہیں یا متن ٹائپ کر سکتے ہیں۔</p>
-            <button id="permissionBtn" type="button">مائیکروفون کی اجازت دیں</button>
-            <div id="errorMsg" class="message error hidden" role="alert"></div>
-            <div id="instructions" class="hidden">
-                <h3>اگر آپ کو اجازت ڈائیلاگ نہیں دکھایا گیا:</h3>
-                <ol>
-                    <li>براؤزر کے ایڈریس بار میں آئیکن پر کلک کریں</li>
-                    <li>مائیکروفون کی اجازت کو "اجازت دیں" پر سیٹ کریں</li>
-                    <li>صفحہ کو ریفریش کریں اور دوبارہ کوشش کریں</li>
-                </ol>
-            </div>
-        </div>
+        <div class="live-grid">
+            <div class="live-col-input">
+              <div class="live-col-scroll">
 
-        <div class="entry-points">
-            <!-- Record New -->
-            <section id="recordSection" class="container hidden" aria-labelledby="recordHeading">
-                <h2 id="recordHeading">🎙️ نئی ریکارڈنگ</h2>
-                <div id="successMsg" class="message success hidden">مائیکروفون کی اجازت مل گئی!</div>
-
-                <canvas id="visualizer" width="600" height="60" aria-hidden="true"></canvas>
-
-                <div class="status-text">
-                    <span id="recordingStatus">ریکارڈنگ تیار ہے</span>
-                    <span id="recordingTime" class="recording-time hidden">00:00</span>
-                </div>
-
-                <div class="button-container">
-                    <button id="startBtn" type="button">
-                        <span class="recording-indicator"></span>
-                       🔴 ریکارڈنگ شروع کریں
-                    </button>
-                    <button id="pauseBtn" type="button" disabled>⏸ روکیں</button>
-                    <button id="stopBtn" type="button" disabled>
-                        <span class="recording-indicator"></span>
-                        ⏹ ریکارڈنگ ختم کریں
-                    </button>
-                    <button id="clearBtn" type="button">🗑️ صاف کریں</button>
-                </div>
-            </section>
-
-            <!-- Upload File -->
-            <section id="uploadSection" class="container" aria-labelledby="uploadHeading">
-                <h2 id="uploadHeading">📁 فائل اپ لوڈ کریں</h2>
-                <div id="dropZone" class="drop-zone" tabindex="0" role="button"
-                     aria-label="آڈیو فائل یہاں گھسیٹیں یا منتخب کرنے کے لیے کلک کریں">
-                    <p>فائل یہاں گھسیٹیں یا کلک کر کے منتخب کریں</p>
-                    <p class="drop-zone-hint">MP3, WAV, M4A, FLAC, WebM, OGG — زیادہ سے زیادہ <span id="maxUploadHint">100MB</span></p>
-                    <label for="audioFileInput" class="sr-only">آڈیو فائل منتخب کریں</label>
-                    <input type="file" id="audioFileInput" accept="audio/webm,audio/mp3,audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/aac,audio/flac,audio/x-flac,audio/x-m4a,audio/x-wav">
-                </div>
-            </section>
-        </div>
-
-        <!-- Shared workspace: language selection + results -->
-        <section id="workspace" class="container" aria-label="نتائج">
-            <div class="language-row">
-                <div class="language-field">
-                    <label for="sourceLanguage">ماخذ زبان (Source)</label>
-                    <select id="sourceLanguage"></select>
-                </div>
-                <span class="language-arrow" aria-hidden="true">→</span>
-                <div class="language-field">
-                    <label for="targetLanguage">ہدف زبان (Target)</label>
-                    <select id="targetLanguage"></select>
-                </div>
-            </div>
-
-            <div class="outputs-grid">
-                <div class="output-container">
-                    <h3 id="urduLabel">ماخذ متن (قابلِ ترمیم)</h3>
-                    <label for="urduText" class="sr-only">ماخذ متن، آپ اسے یہاں ٹائپ یا ترمیم کر سکتے ہیں</label>
-                    <textarea id="urduText" aria-labelledby="urduLabel" placeholder="یہاں متن ٹائپ کریں یا ریکارڈنگ/اپ لوڈ کا انتظار کریں..."></textarea>
-                    <div class="output-actions">
-                        <button id="copyUrduBtn" type="button">📋 کاپی کریں</button>
-                        <button id="saveAudioBtn" type="button" disabled>💾 آڈیو محفوظ کریں (MP3)</button>
-                        <button id="translateBtn" type="button" disabled>🌐 ترجمہ کریں</button>
+                <!-- Mic permission gate -->
+                <div id="step1" class="card">
+                    <div class="card-icon-row">
+                        <span class="icon-circle" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
+                        </span>
+                        <div>
+                            <h2 data-i18n="micCardTitle">Microphone access required</h2>
+                            <p data-i18n="micCardDesc">Allow access to record audio. You can still upload a file or type text without it.</p>
+                        </div>
+                    </div>
+                    <button id="permissionBtn" type="button" class="btn btn-primary btn-block" data-i18n="allowMicBtn">Allow microphone</button>
+                    <div id="instructions" class="hint-block hidden">
+                        <strong data-i18n="instructionsTitle">If you weren't shown a permission dialog:</strong>
+                        <ol>
+                            <li data-i18n="instructionsStep1">Click the icon in your browser's address bar</li>
+                            <li data-i18n="instructionsStep2">Set microphone permission to "Allow"</li>
+                            <li data-i18n="instructionsStep3">Refresh the page and try again</li>
+                        </ol>
                     </div>
                 </div>
 
-                <div class="output-container">
-                    <h3 id="englishLabel">
-                        Translation
-                        <span id="staleNotice" class="stale-badge hidden">⚠ Outdated — translate again</span>
-                    </h3>
-                    <label for="englishText" class="sr-only">Translation output, read only</label>
-                    <textarea id="englishText" readonly aria-labelledby="englishLabel" placeholder="Translation will appear here"></textarea>
-                    <div class="output-actions">
-                        <button id="copyEnglishBtn" type="button" disabled>📋 Copy translation</button>
-                        <div class="export-group">
-                            <button id="exportTxtBtn" type="button" disabled>⬇ TXT</button>
-                            <button id="exportDocxBtn" type="button" disabled>⬇ DOCX</button>
-                            <button id="exportPdfBtn" type="button" disabled>⬇ PDF</button>
+                <!-- Record -->
+                <section id="recordSection" class="card hidden" aria-labelledby="recordHeading">
+                    <h2 id="recordHeading" data-i18n="recordCardTitle">Record audio</h2>
+                    <div class="card-title-row">
+                        <span class="status-dot-label"><span class="status-dot" id="recordingDot"></span><span id="recordingStatus" data-i18n="statusReady">Ready</span></span>
+                    </div>
+
+                    <div id="recordFileList" class="upload-file-list" aria-live="polite"></div>
+
+                    <div class="record-visual">
+                        <div class="mic-circle-group">
+                            <button type="button" id="startBtn" class="mic-circle-btn" aria-label="Start recording">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
+                            </button>
+                            <b class="mic-circle-label" id="startBtnLabel" data-i18n="startRecordingLabel">Start recording</b>
+                        </div>
+                        <canvas id="visualizer" width="480" height="56" aria-hidden="true"></canvas>
+                    </div>
+
+                    <p class="record-time-row"><span id="recordingTime">00:00</span> / <span id="maxDurationLabel">10:00</span></p>
+
+                    <div class="button-row">
+                        <button id="pauseBtn" type="button" class="btn btn-secondary btn-sm" disabled>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                            <span id="pauseBtnLabel" data-i18n="pauseBtn">Pause</span>
+                        </button>
+                        <button id="stopBtn" type="button" class="btn btn-secondary btn-sm" disabled>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+                            <span data-i18n="stopBtn">Stop</span>
+                        </button>
+                        <button id="clearBtn" type="button" class="btn btn-ghost btn-sm">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                            <span data-i18n="clearBtn">Clear</span>
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Upload -->
+                <section id="uploadSection" class="card" aria-labelledby="uploadHeading">
+                    <h2 id="uploadHeading" data-i18n="uploadCardTitle">Upload audio file</h2>
+                    <div id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="Drag an audio file here, or press Enter to choose one">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.5 4.5 0 0 1-1-8.9A5.5 5.5 0 0 1 16.9 7.1 4 4 0 0 1 17 15h-1"/><polyline points="12 12 12 21"/><polyline points="9 15 12 12 15 15"/></svg>
+                        <p data-i18n="dropHint">Drag &amp; drop an audio file here, or click to browse</p>
+                        <p class="drop-zone-hint"><span data-i18n="uploadFormats">MP3, WAV, M4A, FLAC, WebM, OGG</span> &bull; <span data-i18n="uploadMaxPrefix">Max</span> <span id="maxUploadHint">100 MB</span></p>
+                        <label for="audioFileInput" class="sr-only" data-i18n="chooseFileLabel">Choose an audio file</label>
+                        <input type="file" id="audioFileInput" accept="audio/webm,audio/mp3,audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/aac,audio/flac,audio/x-flac,audio/x-m4a,audio/x-wav">
+                    </div>
+                    <div id="uploadFileList" class="upload-file-list" aria-live="polite"></div>
+                </section>
+
+              </div>
+
+                <div class="language-row">
+                    <div class="language-field">
+                        <label for="sourceLanguage" data-i18n="sourceLabel">Source language</label>
+                        <select id="sourceLanguage"></select>
+                    </div>
+                    <button type="button" class="icon-btn swap-btn" id="swapLangBtn" aria-label="Swap source and target languages">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                    </button>
+                    <div class="language-field">
+                        <label for="targetLanguage" data-i18n="targetLabel">Target language</label>
+                        <select id="targetLanguage"></select>
+                    </div>
+                </div>
+
+                <button id="transcribeManualBtn" type="button" class="btn btn-primary btn-block" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="10" x2="4" y2="14"/><line x1="8" y1="6" x2="8" y2="18"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="16" y1="6" x2="16" y2="18"/><line x1="20" y1="10" x2="20" y2="14"/></svg>
+                    <span data-i18n="transcribeBtn">Transcribe audio</span>
+                </button>
+            </div>
+
+            <div class="live-col-workspace">
+                <div class="card workspace-card">
+                    <div class="card-title-row">
+                        <div>
+                            <h2 data-i18n="workspaceTitle">Transcription workspace</h2>
+                            <p class="muted-sub" id="workspaceSubtitle" data-i18n="workspaceSubtitleIdle">Results will appear below</p>
+                        </div>
+                        <span class="badge neutral" id="workspaceStatusBadge" data-i18n="statusIdle">Idle</span>
+                    </div>
+
+                    <div class="workspace-tabs" role="tablist" aria-label="Workspace panel">
+                        <button type="button" class="active" id="workspaceTabTranscription" data-panel="transcription" role="tab" aria-selected="true"></button>
+                        <button type="button" id="workspaceTabTranslation" data-panel="translation" role="tab" aria-selected="false"></button>
+                    </div>
+
+                    <div class="workspace-panels" id="workspacePanels" data-active="transcription">
+                        <div class="panel panel-transcription">
+                            <div class="panel-head">
+                                <h3 id="transcriptionPanelTitle">Urdu transcription</h3>
+                                <div class="panel-head-actions">
+                                    <span class="lang-pill" id="transcriptionLangPill">UR &middot; RTL</span>
+                                    <button type="button" class="icon-btn" id="copyUrduBtn" aria-label="Copy transcription">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <p class="panel-meta"><span id="transcriptionWordCount">Word count: 0</span></p>
+                            <label for="urduText" class="sr-only" data-i18n="transcriptionTextareaLabel">Transcription text, editable</label>
+                            <textarea id="urduText" dir="rtl" class="script-rtl" placeholder="یہاں متن ٹائپ کریں یا ریکارڈنگ/اپ لوڈ کا انتظار کریں..."></textarea>
+                        </div>
+                        <div class="panel panel-translation">
+                            <div class="panel-head">
+                                <h3 id="translationPanelTitle">English translation</h3>
+                                <div class="panel-head-actions">
+                                    <span class="lang-pill" id="translationLangPill">EN &middot; LTR</span>
+                                    <button type="button" class="icon-btn" id="copyEnglishBtn" disabled aria-label="Copy translation">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <p class="panel-meta"><span id="translationWordCount">Word count: 0</span><span id="staleNotice" class="stale-badge hidden" data-i18n="staleNotice">Outdated &mdash; translate again</span></p>
+                            <label for="englishText" class="sr-only" data-i18n="translationTextareaLabel">Translation, read only</label>
+                            <textarea id="englishText" readonly dir="ltr" class="script-ltr" placeholder="Your translation will appear here"></textarea>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div id="translateStatus" class="status-text" role="status" aria-live="polite"></div>
-            <div id="translateError" class="message error hidden" role="alert"></div>
-            <div id="debug" class="hidden"></div>
-        </section>
-    </div>
+        <div class="action-row">
+            <button id="translateBtn" type="button" class="btn btn-primary" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg>
+                <span id="translateBtnLabel" data-i18n="translateBtn">Translate</span>
+            </button>
+            <button id="saveAudioBtn" type="button" class="btn btn-secondary" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                <span data-i18n="saveAudioBtn">Save MP3</span>
+            </button>
+            <div class="dropdown" id="downloadDropdown">
+                <button type="button" class="btn btn-secondary btn-block" id="downloadToggleBtn" disabled aria-haspopup="true" aria-expanded="false">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <span data-i18n="downloadBtn">Download</span>
+                    <svg class="dropdown-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="dropdown-menu hidden" id="downloadMenu" role="menu">
+                    <button type="button" id="exportTxtBtn" data-format="txt" role="menuitem">TXT</button>
+                    <button type="button" id="exportDocxBtn" data-format="docx" role="menuitem">DOCX</button>
+                    <button type="button" id="exportPdfBtn" data-format="pdf" role="menuitem">PDF</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="translateStatus" class="status-text" role="status" aria-live="polite"></div>
+
+        <div id="translateError" class="banner banner-error hidden" role="alert">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17"/></svg>
+            <div class="banner-body">
+                <p id="translateErrorText"></p>
+                <button type="button" class="btn btn-sm btn-secondary" id="retryBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    <span data-i18n="retryBtn">Retry</span>
+                </button>
+            </div>
+            <button type="button" class="icon-btn-tiny banner-dismiss" id="dismissErrorBtn" aria-label="Dismiss">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+
+        <button type="button" class="tech-details-toggle hidden" id="techDetailsToggle" aria-expanded="false">
+            <span data-i18n="techDetailsToggle">Technical details</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <pre id="techDetails" class="tech-details hidden"></pre>
+    </section>
 
     <!-- ==================== HISTORY TAB ==================== -->
-    <div id="tabHistory" class="tab-panel hidden" role="tabpanel" aria-labelledby="tabBtnHistory">
-        <section class="container">
-            <h2>🕘 ریکارڈنگ ہسٹری</h2>
+    <section id="tabHistory" class="tab-panel hidden" role="tabpanel" aria-labelledby="tabBtnHistory">
 
-            <form id="historyFilters" class="history-filters">
-                <div class="filter-field">
-                    <label for="historyQuery">تلاش کریں</label>
-                    <input type="search" id="historyQuery" placeholder="فائل کا نام یا متن...">
+        <div class="history-head">
+            <div>
+                <h2 data-i18n="historyTitle">Recording history</h2>
+                <p class="brand-sub">ریکارڈنگ ہسٹری</p>
+                <p class="muted-sub" data-i18n="historySubtitle">Search, review and manage your transcriptions</p>
+            </div>
+            <button type="button" class="btn btn-secondary" id="exportHistoryBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span data-i18n="exportHistoryBtn">Export history</span>
+            </button>
+        </div>
+
+        <div class="stats-row">
+            <div class="stat-card">
+                <span class="stat-icon total" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                </span>
+                <div><div class="stat-value" id="statTotal">0</div><div class="stat-label" data-i18n="statRecordings">Recordings</div></div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-icon completed" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg>
+                </span>
+                <div><div class="stat-value" id="statCompleted">0</div><div class="stat-label" data-i18n="statCompletedLabel">Completed</div></div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-icon failed" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17"/></svg>
+                </span>
+                <div><div class="stat-value" id="statFailed">0</div><div class="stat-label" data-i18n="statFailedLabel">Failed</div></div>
+            </div>
+        </div>
+
+        <form id="historyFilters" class="history-filters card">
+            <div class="filters-toolbar">
+                <div class="filter-field filter-search">
+                    <label for="historyQuery" class="sr-only" data-i18n="searchLabel">Search recordings</label>
+                    <span class="input-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="search" id="historyQuery" data-i18n-placeholder="searchPlaceholder" placeholder="Search recordings">
+                    </span>
                 </div>
+                <button type="button" class="btn btn-secondary btn-sm filters-toggle-btn" id="filtersToggleBtn" aria-expanded="true" aria-controls="filtersCollapse">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
+                    <span data-i18n="filtersToggle">Filters</span>
+                    <span class="badge neutral filters-badge hidden" id="filtersBadge"><span id="filtersCount">0</span></span>
+                </button>
+            </div>
+
+            <div id="filtersCollapse" class="filters-collapse">
                 <div class="filter-field">
-                    <label for="historySourceType">ذریعہ</label>
+                    <label for="historySourceType" class="sr-only" data-i18n="sourceTypeLabel">Source</label>
                     <select id="historySourceType">
-                        <option value="">سب</option>
-                        <option value="recorded">ریکارڈ شدہ</option>
-                        <option value="uploaded">اپ لوڈ شدہ</option>
+                        <option value="" data-i18n="allSources">All sources</option>
+                        <option value="recorded" data-i18n="sourceRecorded">Recorded</option>
+                        <option value="uploaded" data-i18n="sourceUploaded">Uploaded</option>
                     </select>
                 </div>
                 <div class="filter-field">
-                    <label for="historyStatus">حالت</label>
+                    <label for="historyStatus" class="sr-only" data-i18n="statusFieldLabel">Status</label>
                     <select id="historyStatus">
-                        <option value="">سب</option>
-                        <option value="pending">زیر التوا</option>
-                        <option value="transcribing">ٹرانسکرائب ہو رہا ہے</option>
-                        <option value="transcribed">ٹرانسکرائب شدہ</option>
-                        <option value="translating">ترجمہ ہو رہا ہے</option>
-                        <option value="completed">مکمل</option>
-                        <option value="failed">ناکام</option>
+                        <option value="" data-i18n="allStatuses">All statuses</option>
+                        <option value="pending" data-i18n="statusPending">Pending</option>
+                        <option value="transcribing" data-i18n="statusTranscribing">Transcribing</option>
+                        <option value="transcribed" data-i18n="statusTranscribed">Transcribed</option>
+                        <option value="translating" data-i18n="statusTranslating">Translating</option>
+                        <option value="completed" data-i18n="statusCompleted">Completed</option>
+                        <option value="failed" data-i18n="statusFailed">Failed</option>
                     </select>
                 </div>
                 <div class="filter-field">
-                    <label for="historyDateFrom">تاریخ سے</label>
+                    <label for="historyDateFrom" data-i18n="fromDateLabel">From date</label>
                     <input type="date" id="historyDateFrom">
                 </div>
                 <div class="filter-field">
-                    <label for="historyDateTo">تاریخ تک</label>
+                    <label for="historyDateTo" data-i18n="toDateLabel">To date</label>
                     <input type="date" id="historyDateTo">
                 </div>
-                <button type="submit" id="historySearchBtn">تلاش کریں</button>
-            </form>
+                <button type="submit" class="btn btn-primary btn-sm" id="historySearchBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <span data-i18n="searchBtn">Search</span>
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" id="historyClearBtn" data-i18n="clearFiltersBtn">Clear filters</button>
+            </div>
+        </form>
 
-            <div id="historyStatus2" class="status-text" role="status" aria-live="polite"></div>
+        <div id="historyStatus2" class="status-text" role="status" aria-live="polite"></div>
 
-            <div class="scroller">
+        <div class="scroller history-table-wrap">
             <table id="historyTable" class="history-table hidden">
                 <thead>
                     <tr>
-                        <th>تاریخ</th>
-                        <th>فائل</th>
-                        <th>ذریعہ</th>
-                        <th>دورانیہ</th>
-                        <th>حالت</th>
+                        <th data-i18n="colRecording">Recording</th>
+                        <th data-i18n="colSource">Source</th>
+                        <th data-i18n="colDuration">Duration</th>
+                        <th data-i18n="colLanguages">Languages</th>
+                        <th data-i18n="colCreated">Created</th>
+                        <th data-i18n="colStatus">Status</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody id="historyTableBody"></tbody>
             </table>
+        </div>
+
+        <div id="historyCardList" class="history-card-list hidden"></div>
+
+        <div id="historyEmpty" class="message hidden" data-i18n="emptyState">No recordings found.</div>
+
+        <div class="pagination-row">
+            <span id="historyPageInfo" class="muted-sub"></span>
+            <div class="pagination-controls">
+                <button id="historyPrevBtn" type="button" class="btn btn-secondary btn-sm" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+                    <span data-i18n="prevBtn">Previous</span>
+                </button>
+                <span id="historyPageNumbers" class="page-numbers"></span>
+                <button id="historyNextBtn" type="button" class="btn btn-secondary btn-sm" disabled>
+                    <span data-i18n="nextBtn">Next</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
             </div>
-            <div id="historyEmpty" class="message hidden">کوئی ریکارڈنگ نہیں ملی۔</div>
-            <div class="button-container">
-                <button id="historyPrevBtn" type="button" disabled>◀ پچھلا</button>
-                <span id="historyPageInfo" class="status-text"></span>
-                <button id="historyNextBtn" type="button" disabled>اگلا ▶</button>
-            </div>
-        </section>
+        </div>
 
         <!-- Detail panel -->
-        <section id="historyDetail" class="container hidden" aria-label="ریکارڈنگ کی تفصیل">
-            <button type="button" id="historyDetailClose" class="detail-close">✕ بند کریں</button>
-            <h2>تفصیل</h2>
-            <audio id="historyAudioPlayer" controls class="history-audio"></audio>
-            <div class="outputs-grid">
-                <div class="output-container">
-                    <h3>ماخذ متن</h3>
-                    <textarea id="historyTranscriptionText" readonly></textarea>
+        <div id="historyDetailOverlay" class="overlay hidden">
+            <div id="historyDetail" class="detail-panel card" role="dialog" aria-modal="true" aria-label="Recording detail">
+                <div class="card-title-row">
+                    <h2 data-i18n="detailTitle">Recording detail</h2>
+                    <button type="button" id="historyDetailClose" class="icon-btn" aria-label="Close">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
                 </div>
-                <div class="output-container">
-                    <h3>ترجمہ</h3>
-                    <textarea id="historyTranslationText" readonly></textarea>
+                <audio id="historyAudioPlayer" controls class="history-audio"></audio>
+                <div class="outputs-grid">
+                    <div class="output-container">
+                        <h3 data-i18n="colTranscription">Transcription</h3>
+                        <textarea id="historyTranscriptionText" readonly></textarea>
+                    </div>
+                    <div class="output-container">
+                        <h3 data-i18n="colTranslation">Translation</h3>
+                        <textarea id="historyTranslationText" readonly></textarea>
+                    </div>
+                </div>
+                <div class="button-row">
+                    <div class="dropdown" id="historyExportDropdown">
+                        <button type="button" class="btn btn-secondary" id="historyExportToggleBtn" aria-haspopup="true" aria-expanded="false">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            <span data-i18n="downloadBtn">Download</span>
+                            <svg class="dropdown-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <div class="dropdown-menu hidden" id="historyExportMenu" role="menu">
+                            <button type="button" id="historyExportTxtBtn" data-format="txt" role="menuitem">TXT</button>
+                            <button type="button" id="historyExportDocxBtn" data-format="docx" role="menuitem">DOCX</button>
+                            <button type="button" id="historyExportPdfBtn" data-format="pdf" role="menuitem">PDF</button>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-danger" id="historyDeleteBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                        <span data-i18n="deleteBtn">Delete</span>
+                    </button>
                 </div>
             </div>
-            <div class="button-container">
-                <button id="historyExportTxtBtn" type="button">⬇ TXT</button>
-                <button id="historyExportDocxBtn" type="button">⬇ DOCX</button>
-                <button id="historyExportPdfBtn" type="button">⬇ PDF</button>
-                <button id="historyDeleteBtn" type="button" class="danger">🗑️ حذف کریں</button>
-            </div>
-        </section>
-    </div>
+        </div>
+    </section>
     </main>
+</div>
 
-    <div id="toastContainer" aria-live="polite" aria-atomic="false"></div>
+<div id="toastContainer" aria-live="polite" aria-atomic="false"></div>
 
-    <script src="app.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

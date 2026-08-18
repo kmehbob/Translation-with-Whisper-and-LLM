@@ -14,6 +14,7 @@ const transcribeRouter = require("./routes/transcribe");
 const translateRouter = require("./routes/translate");
 const healthRouter = require("./routes/health");
 const recordingsRouter = require("./routes/recordings");
+const audioConvertRouter = require("./routes/audioConvert");
 const recordingsRepo = require("./lib/recordingsRepo");
 const audioStorage = require("./lib/audioStorage");
 
@@ -80,6 +81,10 @@ if (config.enableAiFeatures) {
 }
 
 app.use("/api/v1/recordings", recordingsRouter);
+// Plain ffmpeg format conversion (no transcription/AI, no persistence) so a
+// recording can be saved as MP3 immediately - kept independent of
+// ENABLE_AI_FEATURES since it never touches the AI services.
+app.use("/api/v1/audio", audioConvertRouter);
 app.use("/api/v1", healthRouter);
 
 // Legacy health check endpoint (preserved for existing monitoring)
