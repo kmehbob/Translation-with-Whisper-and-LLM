@@ -1,0 +1,4 @@
+/* Utilities only (no @tailwind base/components) - see tailwind.config.js for
+   why: this app already has its own reset/theme in style.css, and we only
+   want Tailwind's utility classes (flex, gap, spacing, etc.) on top of it. */
+@tailwind utilities;

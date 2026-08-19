@@ -55,3 +55,23 @@ MAX_TRANSLATE_TEXT_LENGTH = _int(os.environ.get("MAX_TRANSLATE_TEXT_LENGTH"), 20
 MODEL_CACHE_DIR = os.environ.get("MODEL_CACHE_DIR", "/models/translation")
 
 WARMUP_ON_STARTUP = _bool(os.environ.get("WARMUP_ON_STARTUP"), True)
+
+# Fail fast at startup on a bad config value instead of a confusing failure
+# deep inside load_model() at first request. TRANSLATION_MODEL_NAME is
+# deliberately NOT validated against a fixed list - it's any HuggingFace
+# repo name/local path.
+_VALID_DEVICES = {"auto", "cpu", "cuda"}
+_VALID_PRECISIONS = {"auto", "fp32", "fp16", "bf16", "int8", "int4"}
+
+if TRANSLATION_DEVICE not in _VALID_DEVICES:
+    raise ValueError(f"Invalid TRANSLATION_DEVICE={TRANSLATION_DEVICE!r}; must be one of {sorted(_VALID_DEVICES)}")
+if TRANSLATION_PRECISION not in _VALID_PRECISIONS:
+    raise ValueError(f"Invalid TRANSLATION_PRECISION={TRANSLATION_PRECISION!r}; must be one of {sorted(_VALID_PRECISIONS)}")
+if MAX_CONCURRENT_TRANSLATIONS <= 0:
+    raise ValueError(f"MAX_CONCURRENT_TRANSLATIONS must be a positive integer, got {MAX_CONCURRENT_TRANSLATIONS}")
+if MAX_CONTEXT_TOKENS <= 0:
+    raise ValueError(f"MAX_CONTEXT_TOKENS must be a positive integer, got {MAX_CONTEXT_TOKENS}")
+if MAX_NEW_TOKENS <= 0:
+    raise ValueError(f"MAX_NEW_TOKENS must be a positive integer, got {MAX_NEW_TOKENS}")
+if MAX_INPUT_TOKENS_PER_CHUNK <= 0:
+    raise ValueError(f"MAX_INPUT_TOKENS_PER_CHUNK must be a positive integer, got {MAX_INPUT_TOKENS_PER_CHUNK}")

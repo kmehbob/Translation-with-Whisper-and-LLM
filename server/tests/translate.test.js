@@ -125,6 +125,15 @@ describe("POST /api/v1/translate", () => {
         expect(res.body.error).not.toMatch(/timeout of 30000ms exceeded/);
     });
 
+    test("surfaces the AI service's specific 4xx message, whether it uses {error} or FastAPI's default {detail} shape", async () => {
+        mockRequest.mockResolvedValue({ status: 400, data: { detail: "Text exceeds the maximum allowed length" } });
+
+        const res = await request(app).post("/api/v1/translate").send({ text: "سلام" });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe("Text exceeds the maximum allowed length");
+    });
+
     test("returns a safe 503 when the translation service is unreachable", async () => {
         const connError = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:8002"), { code: "ECONNREFUSED" });
         mockRequest.mockRejectedValue(connError);
@@ -159,6 +168,12 @@ describe("POST /api/v1/translate", () => {
         const res = await request(app).post("/api/v1/translate").send({ text: "سلام" });
         expect(res.body.requestId).toBeTruthy();
         expect(res.headers["x-request-id"]).toBeTruthy();
+    });
+
+    test("marks the response as private/no-store since it contains translated text", async () => {
+        mockRequest.mockResolvedValue({ status: 200, data: { translation: "Hi" } });
+        const res = await request(app).post("/api/v1/translate").send({ text: "سلام" });
+        expect(res.headers["cache-control"]).toBe("private, no-store");
     });
 
     describe("recordingId attachment", () => {

@@ -10,8 +10,10 @@ const { transcribeLimiter } = require("../lib/rateLimiters");
 const { requireClientApiKey } = require("../middleware/auth");
 const audioStorage = require("../lib/audioStorage");
 const { deleteTransientFile } = require("../lib/tempFile");
+const noStoreCache = require("../middleware/noStoreCache");
 
 const router = express.Router();
+router.use(noStoreCache);
 
 const ALLOWED_MIMES = [
     "audio/webm",

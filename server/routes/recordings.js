@@ -11,10 +11,12 @@ const { exportRecording, SUPPORTED_FORMATS } = require("../lib/exporters");
 const { requireClientApiKey } = require("../middleware/auth");
 const { transcribeLimiter } = require("../lib/rateLimiters");
 const { deleteTransientFile } = require("../lib/tempFile");
+const noStoreCache = require("../middleware/noStoreCache");
 
 const router = express.Router();
 
 router.use(requireClientApiKey);
+router.use(noStoreCache);
 
 // Same allow-list/naming guard as routes/transcribe.js - kept duplicated
 // rather than shared, so this route can't accidentally regress if that

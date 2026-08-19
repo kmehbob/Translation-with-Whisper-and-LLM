@@ -13,8 +13,10 @@ const { createServiceClient, callService } = require("../lib/serviceClient");
 const audioStorage = require("../lib/audioStorage");
 const recordingsRepo = require("../lib/recordingsRepo");
 const { deleteTransientFile } = require("../lib/tempFile");
+const noStoreCache = require("../middleware/noStoreCache");
 
 const router = express.Router();
+router.use(noStoreCache);
 
 const ALLOWED_MIMES = [
     "audio/webm",

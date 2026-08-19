@@ -47,9 +47,13 @@ Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud
 
 ```bash
 cd server
-npm test                                    # Node unit tests
-cd ai-services/transcription && pytest      # Python unit tests (heavy ML deps not required)
-cd ai-services/translation && pytest
+npm test                                                       # Node unit tests
+
+cd ai-services/transcription
+pip install -r requirements-dev.txt && pytest                  # Python unit tests (heavy ML deps not required)
+
+cd ../translation
+pip install -r requirements-dev.txt && pytest
 ```
 
 Gated integration tests that exercise the real models require `RUN_GPU_INTEGRATION_TESTS=1` and a running GPU deployment — see `npm run test:integration` and the docs above.

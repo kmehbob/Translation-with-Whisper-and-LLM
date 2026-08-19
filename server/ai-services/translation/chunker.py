@@ -35,24 +35,59 @@ def _split_with_separators(text, pattern):
     return pieces
 
 
+def _hard_split_by_chars(text, count_tokens, max_tokens_per_chunk):
+    """Last-resort fallback for a single whitespace-free run of text (e.g. a
+    long URL, hash, or serial number) that is still over budget after
+    word-level splitting has nothing left to split on. Binary-searches for
+    the longest prefix that fits so the max_tokens_per_chunk guarantee holds
+    even with no natural split point."""
+    pieces = []
+    remaining = text
+    while remaining:
+        if count_tokens(remaining) <= max_tokens_per_chunk:
+            pieces.append({"is_sep": False, "text": remaining})
+            break
+        lo, hi, best = 1, len(remaining), 1
+        while lo <= hi:
+            mid = (lo + hi) // 2
+            if count_tokens(remaining[:mid]) <= max_tokens_per_chunk:
+                best = mid
+                lo = mid + 1
+            else:
+                hi = mid - 1
+        pieces.append({"is_sep": False, "text": remaining[:best]})
+        remaining = remaining[best:]
+    return pieces
+
+
 def _split_oversized_unit(text, count_tokens, max_tokens_per_chunk):
     """Splits a unit of text that exceeds the token budget on its own: first
-    by sentence punctuation, then - only for any resulting piece that is
-    STILL over budget - by whitespace, so no piece handed to the model can
-    ever exceed max_tokens_per_chunk regardless of how it's punctuated."""
+    by sentence punctuation, then by whitespace for any resulting piece
+    that's still over budget, then (last resort) by raw character count for
+    any single whitespace-free run that's still over budget even alone -
+    e.g. a long URL or hash. No piece handed to the model can ever exceed
+    max_tokens_per_chunk regardless of how it's punctuated or spaced."""
     pieces = _split_with_separators(text, SENTENCE_SPLIT_RE)
     if len(pieces) == 1 and not pieces[0]["is_sep"]:
         # No sentence-ending punctuation at all - nothing to gain from the
         # sentence pass, go straight to word-level splitting.
-        return _split_with_separators(text, WORD_SPLIT_RE)
+        pieces = _split_with_separators(text, WORD_SPLIT_RE)
+    else:
+        result = []
+        for piece in pieces:
+            if piece["is_sep"] or count_tokens(piece["text"]) <= max_tokens_per_chunk:
+                result.append(piece)
+            else:
+                result.extend(_split_with_separators(piece["text"], WORD_SPLIT_RE))
+        pieces = result
 
-    result = []
+    final = []
     for piece in pieces:
         if piece["is_sep"] or count_tokens(piece["text"]) <= max_tokens_per_chunk:
-            result.append(piece)
+            final.append(piece)
         else:
-            result.extend(_split_with_separators(piece["text"], WORD_SPLIT_RE))
-    return result
+            final.extend(_hard_split_by_chars(piece["text"], count_tokens, max_tokens_per_chunk))
+    return final
 
 
 def build_batches(text, count_tokens, max_tokens_per_chunk):

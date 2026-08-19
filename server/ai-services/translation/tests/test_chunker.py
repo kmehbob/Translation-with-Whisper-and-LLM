@@ -65,6 +65,28 @@ def test_sentence_fallback_still_over_budget_falls_back_to_word_split():
     assert raw_concat == long_list
 
 
+def char_count(text):
+    return len(text)
+
+
+def test_single_unbreakable_word_falls_back_to_hard_character_split():
+    # A single whitespace-free run (e.g. a long URL/hash) has no sentence or
+    # word boundary to split on at all - word_count's per-token stand-in
+    # can't exercise this (it always counts an unbroken run as "1 token"
+    # regardless of length), so this test uses a char-count stand-in instead,
+    # where a long-enough single word genuinely exceeds the budget on its own.
+    long_token = "a" * 25
+    batches = build_batches(long_token, char_count, max_tokens_per_chunk=10)
+    assert len(batches) == 1
+    assert batches[0]["kind"] == "sentence_join"
+    pieces = batches[0]["pieces"]
+    assert all(not p["is_sep"] for p in pieces)
+    assert all(char_count(p["text"]) <= 10 for p in pieces)
+    assert len(pieces) == 3  # 25 chars -> 10 + 10 + 5
+    raw_concat = "".join(p["text"] for p in pieces)
+    assert raw_concat == long_token
+
+
 def test_sentence_join_reassembly_preserves_irregular_whitespace():
     # Two sentences separated by a double space and a stray newline inside a
     # single oversized paragraph - the separator must be carried through

@@ -7,8 +7,10 @@ const { translateLimiter } = require("../lib/rateLimiters");
 const { requireClientApiKey } = require("../middleware/auth");
 const { createServiceClient, callService } = require("../lib/serviceClient");
 const recordingsRepo = require("../lib/recordingsRepo");
+const noStoreCache = require("../middleware/noStoreCache");
 
 const router = express.Router();
+router.use(noStoreCache);
 
 const translationClient = createServiceClient(config.translationServiceUrl, config.translateTimeoutMs);
 

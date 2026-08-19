@@ -46,6 +46,11 @@ describe("GET /api/v1/recordings", () => {
         expect(res.status).toBe(200);
         expect(res.body.items.every((r) => r.originalFilename.includes("unique-search-target"))).toBe(true);
     });
+
+    test("marks the response as private/no-store since it can contain transcript/translation content", async () => {
+        const res = await request(app).get("/api/v1/recordings");
+        expect(res.headers["cache-control"]).toBe("private, no-store");
+    });
 });
 
 describe("GET /api/v1/recordings/:id", () => {

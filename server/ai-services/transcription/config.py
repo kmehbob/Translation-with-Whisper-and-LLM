@@ -60,3 +60,20 @@ EXTENSION_BY_CONTENT_TYPE = {
     "audio/ogg": "ogg",
     "audio/aac": "aac",
 }
+
+# Fail fast at startup on a bad config value instead of a confusing failure
+# deep inside load_model() at first request. WHISPER_MODEL_SIZE is
+# deliberately NOT validated against a fixed list here - faster-whisper also
+# accepts arbitrary HuggingFace repo names/local paths for custom/fine-tuned
+# models, so a closed enum would reject legitimate values.
+_VALID_DEVICES = {"auto", "cpu", "cuda"}
+_VALID_COMPUTE_TYPES = {"auto", "int8", "int8_float16", "int8_float32", "int16", "float16", "float32", "bfloat16"}
+
+if WHISPER_DEVICE not in _VALID_DEVICES:
+    raise ValueError(f"Invalid WHISPER_DEVICE={WHISPER_DEVICE!r}; must be one of {sorted(_VALID_DEVICES)}")
+if WHISPER_COMPUTE_TYPE not in _VALID_COMPUTE_TYPES:
+    raise ValueError(f"Invalid WHISPER_COMPUTE_TYPE={WHISPER_COMPUTE_TYPE!r}; must be one of {sorted(_VALID_COMPUTE_TYPES)}")
+if MAX_CONCURRENT_TRANSCRIPTIONS <= 0:
+    raise ValueError(f"MAX_CONCURRENT_TRANSCRIPTIONS must be a positive integer, got {MAX_CONCURRENT_TRANSCRIPTIONS}")
+if MAX_AUDIO_UPLOAD_MB <= 0:
+    raise ValueError(f"MAX_AUDIO_UPLOAD_MB must be a positive integer, got {MAX_AUDIO_UPLOAD_MB}")

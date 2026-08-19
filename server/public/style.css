@@ -464,12 +464,14 @@ main { display: block; }
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
+    padding-top: 10px;
 }
 
 .action-row {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
+    padding-top: 10px;
 }
 
 .action-row .dropdown, .action-row > .btn-secondary { flex: 1; min-width: 150px; }
@@ -486,7 +488,7 @@ main { display: block; }
     box-shadow: var(--shadow-sm);
 }
 
-.card h2 { font-size: 15px; font-weight: 700; }
+.card h2 { font-size: 15px; font-weight: 700;    padding-bottom: 10px; }
 
 .card-title-row {
     display: flex;

@@ -1,4 +1,5 @@
 import asyncio
+import hmac
 import time
 from contextlib import asynccontextmanager
 
@@ -59,7 +60,9 @@ class TranslateRequest(BaseModel):
 def verify_token(authorization: str = Header(default="")):
     if not config.INTERNAL_SERVICE_TOKEN:
         return
-    if authorization != f"Bearer {config.INTERNAL_SERVICE_TOKEN}":
+    # Constant-time comparison - a plain != leaks timing information about
+    # how many leading characters of the secret the caller guessed correctly.
+    if not hmac.compare_digest(authorization, f"Bearer {config.INTERNAL_SERVICE_TOKEN}"):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 

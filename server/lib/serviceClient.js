@@ -85,7 +85,14 @@ async function callService({ client, req, method, url, data, axiosOpts, serviceL
             throw new AiServiceError(`${serviceLabel} is busy, please try again shortly`, 503);
         }
         if (response.status >= 400 && response.status < 500) {
-            const detail = response.data && typeof response.data.error === "string" ? response.data.error : null;
+            // FastAPI's default HTTPException serializes as {"detail": "..."} -
+            // our own error responses use {"error": "..."} - check both so a
+            // specific message from either side actually reaches the client
+            // instead of always falling back to the generic one.
+            const data = response.data;
+            const detail = (data && typeof data.error === "string" && data.error)
+                || (data && typeof data.detail === "string" && data.detail)
+                || null;
             throw new AiServiceError(detail || `Invalid request to ${serviceLabel}`, 400);
         }
         throw new AiServiceError(`${serviceLabel} failed to process the request`, 502);

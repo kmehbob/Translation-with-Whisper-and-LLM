@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap">
     <script src="theme-init.js"></script>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="tailwind.css">
 </head>
 <body>
 <div class="app-shell">
@@ -119,7 +120,7 @@
                     <div id="recordFileList" class="upload-file-list" aria-live="polite"></div>
 
                     <div class="record-visual">
-                        <div class="mic-circle-group">
+                        <div class="mic-circle-group flex flex-col items-center justify-center gap-5">
                             <button type="button" id="startBtn" class="mic-circle-btn" aria-label="Start recording">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
                             </button>
