@@ -757,11 +757,25 @@ main { display: block; }
     justify-content: center;
     flex-shrink: 0;
     box-shadow: 0 0 0 5px var(--accent-teal-soft);
+    cursor: pointer;
+    transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
 }
+
+.mic-circle-btn:hover:not(:disabled) {
+    background: var(--accent-teal);
+    box-shadow: 0 0 0 8px var(--accent-teal-soft);
+    transform: scale(1.05);
+}
+
+.mic-circle-btn:active:not(:disabled) { transform: scale(0.97); }
+
+.mic-circle-btn:disabled { cursor: not-allowed; opacity: 0.6; }
 
 .mic-circle-btn svg { width: 22px; height: 22px; }
 
 .mic-circle-btn.recording { background: var(--danger); box-shadow: 0 0 0 5px var(--danger-soft); animation: pulse-recording 1.6s infinite; }
+
+.mic-circle-btn.recording:hover:not(:disabled) { box-shadow: 0 0 0 8px var(--danger-soft); }
 
 @keyframes pulse-recording {
     0% { box-shadow: 0 0 0 5px var(--danger-soft); }

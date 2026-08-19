@@ -83,6 +83,19 @@ const UI_STRINGS = {
         modeCopy: "Copy",
         copyModeHint: "Click the text to copy it",
         fieldCopiedToast: "Copied to clipboard.",
+        timeJustNow: "Just now",
+        timeMinuteAgo: "1 minute ago",
+        timeMinutesAgo: "{n} minutes ago",
+        timeHourAgo: "1 hour ago",
+        timeHoursAgo: "{n} hours ago",
+        timeDayAgo: "1 day ago",
+        timeDaysAgo: "{n} days ago",
+        timeWeekAgo: "1 week ago",
+        timeWeeksAgo: "{n} weeks ago",
+        timeMonthAgo: "1 month ago",
+        timeMonthsAgo: "{n} months ago",
+        timeYearAgo: "1 year ago",
+        timeYearsAgo: "{n} years ago",
         transcriptionPanelTitleTpl: "{lang} transcription",
         translationPanelTitleTpl: "{lang} translation",
         transcribingStatus: "Transcribing…",
@@ -231,6 +244,19 @@ const UI_STRINGS = {
         modeCopy: "کاپی",
         copyModeHint: "کاپی کرنے کے لیے متن پر کلک کریں",
         fieldCopiedToast: "کلپ بورڈ پر کاپی ہو گیا۔",
+        timeJustNow: "ابھی ابھی",
+        timeMinuteAgo: "1 منٹ پہلے",
+        timeMinutesAgo: "{n} منٹ پہلے",
+        timeHourAgo: "1 گھنٹہ پہلے",
+        timeHoursAgo: "{n} گھنٹے پہلے",
+        timeDayAgo: "1 دن پہلے",
+        timeDaysAgo: "{n} دن پہلے",
+        timeWeekAgo: "1 ہفتہ پہلے",
+        timeWeeksAgo: "{n} ہفتے پہلے",
+        timeMonthAgo: "1 مہینہ پہلے",
+        timeMonthsAgo: "{n} مہینے پہلے",
+        timeYearAgo: "1 سال پہلے",
+        timeYearsAgo: "{n} سال پہلے",
         transcriptionPanelTitleTpl: "{lang} ٹرانسکرپشن",
         translationPanelTitleTpl: "{lang} ترجمہ",
         transcribingStatus: "ٹرانسکرائب ہو رہا ہے…",
@@ -1981,6 +2007,39 @@ function formatLanguagesCell(item) {
     return `${src} → ${tgt}`;
 }
 
+// "August 19, 2026, 4:14 PM" - built manually rather than via a single
+// toLocaleString() call since Intl's combined date+time output varies by
+// engine (some insert "at" instead of a comma).
+function formatReadableDateTime(dateInput) {
+    const date = new Date(dateInput);
+    const datePart = date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    const timePart = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    return `${datePart}, ${timePart}`;
+}
+
+function formatRelativeTime(dateInput) {
+    const diffSec = Math.round((Date.now() - new Date(dateInput).getTime()) / 1000);
+    if (diffSec < 60) return t("timeJustNow");
+
+    const diffMin = Math.round(diffSec / 60);
+    if (diffMin < 60) return t(diffMin === 1 ? "timeMinuteAgo" : "timeMinutesAgo", { n: diffMin });
+
+    const diffHour = Math.round(diffMin / 60);
+    if (diffHour < 24) return t(diffHour === 1 ? "timeHourAgo" : "timeHoursAgo", { n: diffHour });
+
+    const diffDay = Math.round(diffHour / 24);
+    if (diffDay < 7) return t(diffDay === 1 ? "timeDayAgo" : "timeDaysAgo", { n: diffDay });
+
+    const diffWeek = Math.round(diffDay / 7);
+    if (diffWeek < 5) return t(diffWeek === 1 ? "timeWeekAgo" : "timeWeeksAgo", { n: diffWeek });
+
+    const diffMonth = Math.round(diffDay / 30);
+    if (diffMonth < 12) return t(diffMonth === 1 ? "timeMonthAgo" : "timeMonthsAgo", { n: diffMonth });
+
+    const diffYear = Math.round(diffDay / 365);
+    return t(diffYear === 1 ? "timeYearAgo" : "timeYearsAgo", { n: diffYear });
+}
+
 function renderHistory(data) {
     historyTableBody.innerHTML = "";
     historyCardList.innerHTML = "";
@@ -2058,7 +2117,7 @@ function buildTableRow(item) {
         <td><span class="source-pill ${item.sourceType}">${t(item.sourceType === "recorded" ? "sourceRecorded" : "sourceUploaded")}</span></td>
         <td>${formatDuration(item.durationSeconds)}</td>
         <td>${formatLanguagesCell(item)}</td>
-        <td>${new Date(item.createdAt).toLocaleString()}</td>
+        <td><span title="${formatReadableDateTime(item.createdAt)}">${formatRelativeTime(item.createdAt)}</span></td>
         <td><span class="status-pill ${item.status}">${STATUS_ICONS[item.status] || ""}${statusLabel(item.status)}</span></td>
         <td>
             <div class="row-actions">
@@ -2109,7 +2168,7 @@ function buildCard(item) {
             <span class="sep">•</span>
             <span>${formatLanguagesCell(item)}</span>
             <span class="sep">•</span>
-            <span>${new Date(item.createdAt).toLocaleString()}</span>
+            <span title="${formatReadableDateTime(item.createdAt)}">${formatRelativeTime(item.createdAt)}</span>
         </div>
     `;
     card.querySelector(".history-item-name").textContent = name;
