@@ -46,6 +46,11 @@ const UI_STRINGS = {
         mp3ConvertFailed: "Could not convert this recording to MP3.",
         mp3DownloadError: "MP3 download failed: {msg}",
         renameAudioAria: "Rename",
+        closeAria: "Close",
+        openAria: "Open",
+        deleteAria: "Delete",
+        selectAllAria: "Select all",
+        selectRecordingAria: "Select recording",
         modalCancel: "Cancel",
         modalConfirm: "OK",
         modalConfirmTitle: "Confirm",
@@ -77,7 +82,6 @@ const UI_STRINGS = {
         retryBtn: "Retry",
         techDetailsToggle: "Technical details",
         wordCountLabel: "Word count: {n}",
-        copiedLabel: "Copied!",
         copyErrorToast: "Could not copy text.",
         modeEdit: "Edit",
         modeCopy: "Copy",
@@ -96,6 +100,8 @@ const UI_STRINGS = {
         timeMonthsAgo: "{n} months ago",
         timeYearAgo: "1 year ago",
         timeYearsAgo: "{n} years ago",
+        autoDetectOption: "Auto-detect",
+        autoLangLabel: "Auto",
         transcriptionPanelTitleTpl: "{lang} transcription",
         translationPanelTitleTpl: "{lang} translation",
         transcribingStatus: "Transcribing…",
@@ -141,7 +147,6 @@ const UI_STRINGS = {
         colTranscription: "Transcription",
         colTranslation: "Translation",
         emptyState: "No recordings found.",
-        historyLoading: "Loading…",
         historyLoadError: "Could not load history: {msg}",
         showingRangeTpl: "Showing {from}–{to} of {total} recordings",
         showingNone: "No recordings",
@@ -153,7 +158,6 @@ const UI_STRINGS = {
         deleteConfirm: "Are you sure you want to delete this recording?",
         deletedToast: "Recording deleted.",
         deleteError: "Could not delete recording: {msg}",
-        noAudioAvailable: "(no filename)",
         untitled: "(untitled)",
         exportHistoryEmpty: "No recordings to export.",
         bulkSelectedCount: "{n} selected",
@@ -207,6 +211,11 @@ const UI_STRINGS = {
         mp3ConvertFailed: "اس ریکارڈنگ کو MP3 میں تبدیل نہیں کیا جا سکا۔",
         mp3DownloadError: "MP3 ڈاؤن لوڈ ناکام: {msg}",
         renameAudioAria: "نام تبدیل کریں",
+        closeAria: "بند کریں",
+        openAria: "کھولیں",
+        deleteAria: "حذف کریں",
+        selectAllAria: "سب منتخب کریں",
+        selectRecordingAria: "ریکارڈنگ منتخب کریں",
         modalCancel: "منسوخ کریں",
         modalConfirm: "ٹھیک ہے",
         modalConfirmTitle: "تصدیق کریں",
@@ -238,7 +247,6 @@ const UI_STRINGS = {
         retryBtn: "دوبارہ کوشش کریں",
         techDetailsToggle: "تکنیکی تفصیلات",
         wordCountLabel: "الفاظ کی تعداد: {n}",
-        copiedLabel: "کاپی ہو گیا!",
         copyErrorToast: "متن کاپی کرنے میں خرابی۔",
         modeEdit: "ترمیم",
         modeCopy: "کاپی",
@@ -257,6 +265,8 @@ const UI_STRINGS = {
         timeMonthsAgo: "{n} مہینے پہلے",
         timeYearAgo: "1 سال پہلے",
         timeYearsAgo: "{n} سال پہلے",
+        autoDetectOption: "خودکار شناخت",
+        autoLangLabel: "خودکار",
         transcriptionPanelTitleTpl: "{lang} ٹرانسکرپشن",
         translationPanelTitleTpl: "{lang} ترجمہ",
         transcribingStatus: "ٹرانسکرائب ہو رہا ہے…",
@@ -302,7 +312,6 @@ const UI_STRINGS = {
         colTranscription: "ماخذ متن",
         colTranslation: "ترجمہ",
         emptyState: "کوئی ریکارڈنگ نہیں ملی۔",
-        historyLoading: "لوڈ ہو رہا ہے…",
         historyLoadError: "ہسٹری لوڈ کرنے میں خرابی: {msg}",
         showingRangeTpl: "{total} میں سے {from}–{to} ریکارڈنگز دکھائی جا رہی ہیں",
         showingNone: "کوئی ریکارڈنگ نہیں",
@@ -314,7 +323,6 @@ const UI_STRINGS = {
         deleteConfirm: "کیا آپ واقعی اس ریکارڈنگ کو حذف کرنا چاہتے ہیں؟",
         deletedToast: "ریکارڈنگ حذف کر دی گئی۔",
         deleteError: "حذف کرنے میں خرابی: {msg}",
-        noAudioAvailable: "(بغیر نام)",
         untitled: "(بلا عنوان)",
         exportHistoryEmpty: "ایکسپورٹ کے لیے کوئی ریکارڈنگ نہیں۔",
         bulkSelectedCount: "{n} منتخب",
@@ -350,11 +358,21 @@ function applyI18n() {
     document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
         el.setAttribute("placeholder", t(el.getAttribute("data-i18n-placeholder")));
     });
+    document.querySelectorAll("[data-i18n-aria-label]").forEach((el) => {
+        el.setAttribute("aria-label", t(el.getAttribute("data-i18n-aria-label")));
+    });
 
     document.getElementById("uiLangEnBtn").classList.toggle("active", interfaceLang === "en");
     document.getElementById("uiLangEnBtn").setAttribute("aria-pressed", String(interfaceLang === "en"));
     document.getElementById("uiLangUrBtn").classList.toggle("active", interfaceLang === "ur");
     document.getElementById("uiLangUrBtn").setAttribute("aria-pressed", String(interfaceLang === "ur"));
+
+    // The [data-i18n] sweep above always writes the idle "Transcribe audio"
+    // label, even mid-transcription - restore the busy label immediately
+    // after if a transcription is still running.
+    if (transcribing) {
+        transcribeManualBtn.querySelector("span[data-i18n], span:not([aria-hidden])").textContent = t("transcribingBtn");
+    }
 
     renderMicBadge();
     updateLangPillsAndTitles();
@@ -608,11 +626,35 @@ function closeModal(result) {
     if (resolve) resolve(result);
 }
 
+function getModalFocusable() {
+    const items = [appModalCancelBtn, appModalConfirmBtn];
+    if (!appModalInputWrap.classList.contains("hidden")) items.unshift(appModalInput);
+    return items;
+}
+
 function handleModalKeydown(event) {
     if (event.key === "Escape") {
         event.preventDefault();
         closeModal(appModalInputWrap.classList.contains("hidden") ? false : null);
-    } else if (event.key === "Enter" && document.activeElement !== appModalCancelBtn) {
+        return;
+    }
+    // Trap Tab inside the dialog - aria-modal="true" implies background
+    // content is inert, but without this a sighted keyboard user could still
+    // Tab straight past the dialog into it.
+    if (event.key === "Tab") {
+        const focusable = getModalFocusable();
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+        return;
+    }
+    if (event.key === "Enter" && document.activeElement !== appModalCancelBtn) {
         event.preventDefault();
         appModalConfirmBtn.click();
     }
@@ -658,6 +700,35 @@ function promptDialog(message, defaultValue = "", { title, label } = {}) {
 // ============================================================================
 // Tabs
 // ============================================================================
+// Roving tabindex for role="tablist" widgets per the WAI-ARIA tabs pattern:
+// only the active tab is in the Tab order (tabindex 0), the rest are -1, and
+// arrow/Home/End keys move focus *and* activate (this app's tabs already
+// activate on click, so keyboard nav matches that same immediate behavior).
+function syncTabIndexes(tabs) {
+    tabs.forEach((tab) => { tab.tabIndex = tab.classList.contains("active") ? 0 : -1; });
+}
+
+function wireRovingTablist(tabs, activateFn) {
+    syncTabIndexes(tabs);
+    tabs.forEach((tab, index) => {
+        tab.addEventListener("keydown", (e) => {
+            const rtl = document.documentElement.dir === "rtl";
+            const nextKey = rtl ? "ArrowLeft" : "ArrowRight";
+            const prevKey = rtl ? "ArrowRight" : "ArrowLeft";
+            let newIndex = null;
+            if (e.key === nextKey || e.key === "ArrowDown") newIndex = (index + 1) % tabs.length;
+            else if (e.key === prevKey || e.key === "ArrowUp") newIndex = (index - 1 + tabs.length) % tabs.length;
+            else if (e.key === "Home") newIndex = 0;
+            else if (e.key === "End") newIndex = tabs.length - 1;
+            if (newIndex === null) return;
+            e.preventDefault();
+            tabs[newIndex].focus();
+            activateFn(tabs[newIndex]);
+            syncTabIndexes(tabs);
+        });
+    });
+}
+
 const tabBtnCreate = document.getElementById("tabBtnCreate");
 const tabBtnHistory = document.getElementById("tabBtnHistory");
 const tabCreate = document.getElementById("tabCreate");
@@ -671,6 +742,7 @@ function activateTab(name) {
     tabBtnHistory.classList.toggle("active", !creating);
     tabBtnCreate.setAttribute("aria-selected", String(creating));
     tabBtnHistory.setAttribute("aria-selected", String(!creating));
+    syncTabIndexes([tabBtnCreate, tabBtnHistory]);
     if (!creating) {
         loadHistory();
         loadStats();
@@ -679,6 +751,7 @@ function activateTab(name) {
 
 tabBtnCreate.addEventListener("click", () => activateTab("create"));
 tabBtnHistory.addEventListener("click", () => activateTab("history"));
+wireRovingTablist([tabBtnCreate, tabBtnHistory], (tab) => activateTab(tab === tabBtnCreate ? "create" : "history"));
 
 const brandHomeBtn = document.getElementById("brandHomeBtn");
 brandHomeBtn.addEventListener("click", () => activateTab("create"));
@@ -722,7 +795,8 @@ document.getElementById("micInfoBtn").addEventListener("click", () => {
 function populateLanguageSelects() {
     const autoOption = document.createElement("option");
     autoOption.value = "auto";
-    autoOption.textContent = "Auto-detect";
+    autoOption.setAttribute("data-i18n", "autoDetectOption");
+    autoOption.textContent = t("autoDetectOption");
     sourceLanguageSelect.appendChild(autoOption);
 
     for (const [code, label] of LANGUAGES) {
@@ -748,7 +822,7 @@ function updateLangPillsAndTitles() {
     transcriptionLangPill.textContent = src ? langPillText(src) : "AUTO";
     translationLangPill.textContent = langPillText(tgt);
 
-    transcriptionPanelTitle.textContent = t("transcriptionPanelTitleTpl", { lang: src ? languageName(src) : "Auto" });
+    transcriptionPanelTitle.textContent = t("transcriptionPanelTitleTpl", { lang: src ? languageName(src) : t("autoLangLabel") });
     translationPanelTitle.textContent = t("translationPanelTitleTpl", { lang: languageName(tgt) });
 
     const srcRtl = src ? isRtl(src) : true;
@@ -763,7 +837,12 @@ function updateLangPillsAndTitles() {
 }
 
 function updateTranslateButtonLabel() {
-    translateBtnLabel.textContent = t("translateBtnWithLang", { lang: languageName(targetLanguageSelect.value) });
+    // Guard against applyI18n() (called on every interface-language switch)
+    // clobbering the "Translating…" busy label back to the idle one while a
+    // translation is still in flight.
+    translateBtnLabel.textContent = translateInFlight
+        ? t("translatingBtn")
+        : t("translateBtnWithLang", { lang: languageName(targetLanguageSelect.value) });
 }
 
 sourceLanguageSelect.addEventListener("change", () => { updateLangPillsAndTitles(); });
@@ -803,9 +882,11 @@ function setInputMode(mode) {
     inputModeUploadBtn.classList.toggle("active", !recordMode);
     inputModeRecordBtn.setAttribute("aria-selected", String(recordMode));
     inputModeUploadBtn.setAttribute("aria-selected", String(!recordMode));
+    syncTabIndexes([inputModeRecordBtn, inputModeUploadBtn]);
 }
 inputModeRecordBtn.addEventListener("click", () => setInputMode("record"));
 inputModeUploadBtn.addEventListener("click", () => setInputMode("upload"));
+wireRovingTablist([inputModeRecordBtn, inputModeUploadBtn], (tab) => setInputMode(tab === inputModeRecordBtn ? "record" : "upload"));
 
 // ============================================================================
 // Mic permission
@@ -1808,6 +1889,7 @@ const historyNextBtn = document.getElementById("historyNextBtn");
 const historyPageInfo = document.getElementById("historyPageInfo");
 const historyPageNumbers = document.getElementById("historyPageNumbers");
 const historyDetailOverlay = document.getElementById("historyDetailOverlay");
+const historyDetail = document.getElementById("historyDetail");
 const historyDetailClose = document.getElementById("historyDetailClose");
 const historyDetailRenameBtn = document.getElementById("historyDetailRenameBtn");
 const historyAudioPlayer = document.getElementById("historyAudioPlayer");
@@ -1875,10 +1957,7 @@ historyBulkDeleteBtn.addEventListener("click", () => {
         .then((ok) => {
             if (!ok) return;
 
-            return Promise.allSettled(ids.map((id) => fetch(`/api/v1/recordings/${id}`, { method: "DELETE" })
-                .then((res) => {
-                    if (!res.ok && res.status !== 204) throw new Error("Delete failed");
-                })))
+            return Promise.allSettled(ids.map((id) => deleteRecording(id)))
                 .then((results) => {
                     const failed = results.filter((r) => r.status === "rejected").length;
                     const succeeded = results.length - failed;
@@ -2112,7 +2191,7 @@ function buildTableRow(item) {
     tr.setAttribute("role", "button");
     const name = item.originalFilename ? toMp3DisplayName(item.originalFilename) : t("untitled");
     tr.innerHTML = `
-        <td class="col-select"><input type="checkbox" class="row-checkbox" data-id="${item.id}" aria-label="Select recording"></td>
+        <td class="col-select"><input type="checkbox" class="row-checkbox" data-id="${item.id}" aria-label="${t("selectRecordingAria")}"></td>
         <td>
             <div class="rec-file-cell">
                 <span class="rec-file-icon" aria-hidden="true">${FILE_ICON}</span>
@@ -2129,10 +2208,10 @@ function buildTableRow(item) {
         <td><span class="status-pill ${item.status}">${STATUS_ICONS[item.status] || ""}${statusLabel(item.status)}</span></td>
         <td>
             <div class="row-actions">
-                <button type="button" class="icon-btn row-play-btn" aria-label="Open">${PLAY_ICON}</button>
+                <button type="button" class="icon-btn row-play-btn" aria-label="${t("openAria")}">${PLAY_ICON}</button>
                 <button type="button" class="icon-btn row-rename-btn" aria-label="${t("renameAudioAria")}">${EDIT_ICON}</button>
                 <button type="button" class="icon-btn row-download-btn" aria-label="${t("downloadAudioAria")}">${DOWNLOAD_ICON}</button>
-                <button type="button" class="icon-btn row-delete-btn" aria-label="Delete">${TRASH_ICON}</button>
+                <button type="button" class="icon-btn row-delete-btn" aria-label="${t("deleteAria")}">${TRASH_ICON}</button>
             </div>
         </td>
     `;
@@ -2154,17 +2233,17 @@ function buildCard(item) {
     const name = item.originalFilename ? toMp3DisplayName(item.originalFilename) : t("untitled");
     card.innerHTML = `
         <div class="history-item-top">
-            <input type="checkbox" class="card-checkbox" data-id="${item.id}" aria-label="Select recording">
+            <input type="checkbox" class="card-checkbox" data-id="${item.id}" aria-label="${t("selectRecordingAria")}">
             <span class="rec-file-icon" aria-hidden="true">${FILE_ICON}</span>
             <div class="history-item-info">
                 <div class="history-item-name"></div>
                 <div class="history-item-meta">${STORED_AUDIO_FORMAT_LABEL}${item.fileSizeBytes ? " • " + formatBytes(item.fileSizeBytes) : ""}</div>
             </div>
             <div class="row-actions">
-                <button type="button" class="icon-btn row-play-btn" aria-label="Open">${PLAY_ICON}</button>
+                <button type="button" class="icon-btn row-play-btn" aria-label="${t("openAria")}">${PLAY_ICON}</button>
                 <button type="button" class="icon-btn row-rename-btn" aria-label="${t("renameAudioAria")}">${EDIT_ICON}</button>
                 <button type="button" class="icon-btn row-download-btn" aria-label="${t("downloadAudioAria")}">${DOWNLOAD_ICON}</button>
-                <button type="button" class="icon-btn row-delete-btn" aria-label="Delete">${TRASH_ICON}</button>
+                <button type="button" class="icon-btn row-delete-btn" aria-label="${t("deleteAria")}">${TRASH_ICON}</button>
             </div>
         </div>
         <div class="history-item-badges">
@@ -2190,12 +2269,23 @@ function buildCard(item) {
     return card;
 }
 
+// Shared by every single-recording delete call site so a real server-side
+// error message (permission, not-found, etc.) always reaches the user
+// instead of a generic "Delete failed" string.
+function deleteRecording(id) {
+    return fetch(`/api/v1/recordings/${id}`, { method: "DELETE" }).then((res) => {
+        if (res.status === 204) return;
+        return res.json().then((data) => {
+            throw new Error(data.error || "Delete failed");
+        });
+    });
+}
+
 function quickDelete(id) {
     confirmDialog(t("deleteConfirm"), { title: t("modalDeleteTitle"), danger: true, confirmLabel: t("modalDeleteConfirm") }).then((ok) => {
         if (!ok) return;
-        fetch(`/api/v1/recordings/${id}`, { method: "DELETE" })
-            .then((res) => {
-                if (!res.ok && res.status !== 204) throw new Error("Delete failed");
+        deleteRecording(id)
+            .then(() => {
                 showToast(t("deletedToast"), "success");
                 loadHistory();
                 loadStats();
@@ -2253,8 +2343,10 @@ historyNextBtn.addEventListener("click", () => { historyPage += 1; loadHistory()
 
 let openRecordingId = null;
 let openRecordingName = "";
+let historyDetailPreviousFocus = null;
 
 function openHistoryDetail(id) {
+    historyDetailPreviousFocus = document.activeElement;
     fetch(`/api/v1/recordings/${id}`)
         .then((res) => res.json().then((data) => {
             if (!res.ok) throw new Error(data.error || "Error");
@@ -2267,16 +2359,53 @@ function openHistoryDetail(id) {
             historyTranscriptionText.value = rec.transcriptionText || "";
             historyTranslationText.value = rec.translationText || "";
             historyDetailOverlay.classList.remove("hidden");
+            document.addEventListener("keydown", handleHistoryDetailKeydown, true);
+            historyDetailClose.focus();
         })
         .catch((err) => showToast(t("detailLoadError", { msg: err.message }), "error"));
 }
 
 function closeHistoryDetail() {
     historyDetailOverlay.classList.add("hidden");
+    document.removeEventListener("keydown", handleHistoryDetailKeydown, true);
     historyAudioPlayer.pause();
     historyAudioPlayer.src = "";
     openRecordingId = null;
     openRecordingName = "";
+    if (historyDetailPreviousFocus && typeof historyDetailPreviousFocus.focus === "function") {
+        historyDetailPreviousFocus.focus();
+    }
+    historyDetailPreviousFocus = null;
+}
+
+function getFocusableWithin(container) {
+    const selector = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    return Array.from(container.querySelectorAll(selector)).filter((el) => el.offsetParent !== null);
+}
+
+function handleHistoryDetailKeydown(event) {
+    if (event.key === "Escape") {
+        event.preventDefault();
+        closeHistoryDetail();
+        return;
+    }
+    // Same Tab trap as the generic confirm/prompt modal (appModal) - this
+    // dialog's content is more varied (audio player, export dropdown,
+    // textareas), so the focusable set is computed live rather than
+    // hardcoded.
+    if (event.key === "Tab") {
+        const focusable = getFocusableWithin(historyDetail);
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    }
 }
 
 historyDetailRenameBtn.addEventListener("click", () => {
@@ -2298,9 +2427,8 @@ historyDeleteBtn.addEventListener("click", () => {
     confirmDialog(t("deleteConfirm"), { title: t("modalDeleteTitle"), danger: true, confirmLabel: t("modalDeleteConfirm") }).then((ok) => {
         if (!ok) return;
 
-        fetch(`/api/v1/recordings/${openRecordingId}`, { method: "DELETE" })
-            .then((res) => {
-                if (!res.ok && res.status !== 204) throw new Error("Delete failed");
+        deleteRecording(openRecordingId)
+            .then(() => {
                 showToast(t("deletedToast"), "success");
                 closeHistoryDetail();
                 loadHistory();
@@ -2361,14 +2489,19 @@ function setWorkspaceTab(name) {
     workspaceTabTranslation.classList.toggle("active", name === "translation");
     workspaceTabTranscription.setAttribute("aria-selected", String(name === "transcription"));
     workspaceTabTranslation.setAttribute("aria-selected", String(name === "translation"));
+    syncTabIndexes([workspaceTabTranscription, workspaceTabTranslation]);
 }
 workspaceTabTranscription.addEventListener("click", () => setWorkspaceTab("transcription"));
 workspaceTabTranslation.addEventListener("click", () => setWorkspaceTab("translation"));
+wireRovingTablist(
+    [workspaceTabTranscription, workspaceTabTranslation],
+    (tab) => setWorkspaceTab(tab === workspaceTabTranscription ? "transcription" : "translation")
+);
 
 function renderWorkspaceTabLabels() {
     const src = sourceLanguageSelect.value === "auto" ? "" : sourceLanguageSelect.value;
     const tgt = targetLanguageSelect.value;
-    workspaceTabTranscription.textContent = t("transcriptionPanelTitleTpl", { lang: src ? languageName(src) : "Auto" });
+    workspaceTabTranscription.textContent = t("transcriptionPanelTitleTpl", { lang: src ? languageName(src) : t("autoLangLabel") });
     workspaceTabTranslation.textContent = t("translationPanelTitleTpl", { lang: languageName(tgt) });
 }
 sourceLanguageSelect.addEventListener("change", renderWorkspaceTabLabels);

@@ -10,6 +10,7 @@ const audioStorage = require("../lib/audioStorage");
 const { exportRecording, SUPPORTED_FORMATS } = require("../lib/exporters");
 const { requireClientApiKey } = require("../middleware/auth");
 const { transcribeLimiter } = require("../lib/rateLimiters");
+const { deleteTransientFile } = require("../lib/tempFile");
 
 const router = express.Router();
 
@@ -69,25 +70,6 @@ const upload = multer({
     limits: { fileSize: config.maxAudioUploadMb * 1024 * 1024 },
 });
 
-async function deleteTransientFile(filePath) {
-    if (!filePath) return;
-    const maxAttempts = 5;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-            await fs.promises.unlink(filePath);
-            return;
-        } catch (err) {
-            if (err.code === "ENOENT") return;
-            const retryable = err.code === "EBUSY" || err.code === "EPERM";
-            if (!retryable || attempt === maxAttempts) {
-                logger.warn("temp_recording_save_delete_failed", { code: err.code });
-                return;
-            }
-            await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
-        }
-    }
-}
-
 // Publicly-safe projection - never leak the on-disk stored filename/path.
 function toPublicShape(recording) {
     return {
@@ -140,6 +122,7 @@ router.post(
     },
     async (req, res, next) => {
         const uploadedPath = req.file?.path;
+        let converted = null;
         try {
             if (!req.file) {
                 return res.status(400).json({ error: "No audio file was provided", requestId: req.id });
@@ -148,7 +131,7 @@ router.post(
             const sourceType = req.body.source === "uploaded" ? "uploaded" : "recorded";
             const sourceLanguage = (req.body.language || config.defaultSourceLanguage || "auto").trim();
 
-            const converted = await audioStorage.convertToMp3(uploadedPath);
+            converted = await audioStorage.convertToMp3(uploadedPath);
             const durationSeconds = await audioStorage.probeDurationSeconds(converted.storedPath);
 
             const recording = recordingsRepo.create({
@@ -164,30 +147,26 @@ router.post(
             logger.info("recording_saved_pending", { requestId: req.id, recordingId: recording.id, sourceType });
             res.status(201).json(toPublicShape(recordingsRepo.getById(recording.id)));
         } catch (err) {
+            // The MP3 was already written to permanent storage before the DB
+            // write failed - without this it would have no DB row pointing at
+            // it and would never be cleaned up by pruneExpired (which only
+            // ever looks at DB rows), leaking disk space forever.
+            if (converted) await deleteTransientFile(converted.storedPath, "orphaned_recording_delete_failed");
             next(err);
         } finally {
-            await deleteTransientFile(uploadedPath);
+            await deleteTransientFile(uploadedPath, "temp_recording_save_delete_failed");
         }
     }
 );
 
-// A hidden (user-"deleted") recording is treated as gone for every
-// single-item lookup too, not just the list - otherwise "deleting" it
-// wouldn't actually stop it being viewed/played/exported/renamed by anyone
-// who still had (or guessed) its id.
-function getVisibleById(id) {
-    const recording = recordingsRepo.getById(id);
-    return recording && !recording.hidden ? recording : null;
-}
-
 router.get("/:id", (req, res) => {
-    const recording = getVisibleById(req.params.id);
+    const recording = recordingsRepo.getVisibleById(req.params.id);
     if (!recording) return res.status(404).json({ error: "Recording not found", requestId: req.id });
     res.json(toPublicShape(recording));
 });
 
 router.get("/:id/audio", (req, res) => {
-    const recording = getVisibleById(req.params.id);
+    const recording = recordingsRepo.getVisibleById(req.params.id);
     if (!recording) return res.status(404).json({ error: "Recording not found", requestId: req.id });
 
     const filePath = audioStorage.storedFilePath(recording.stored_filename);
@@ -205,7 +184,7 @@ router.get("/:id/export", async (req, res, next) => {
         return res.status(400).json({ error: `Unsupported export format. Use one of: ${SUPPORTED_FORMATS.join(", ")}`, requestId: req.id });
     }
 
-    const recording = getVisibleById(req.params.id);
+    const recording = recordingsRepo.getVisibleById(req.params.id);
     if (!recording) return res.status(404).json({ error: "Recording not found", requestId: req.id });
     if (!recording.transcription_text && !recording.translation_text) {
         return res.status(409).json({ error: "Nothing to export yet for this recording", requestId: req.id });
@@ -226,7 +205,7 @@ router.get("/:id/export", async (req, res, next) => {
 // the on-disk stored_filename - so there is no path-traversal surface here
 // regardless of what the user types.
 router.patch("/:id", (req, res) => {
-    const recording = getVisibleById(req.params.id);
+    const recording = recordingsRepo.getVisibleById(req.params.id);
     if (!recording) return res.status(404).json({ error: "Recording not found", requestId: req.id });
 
     const nextName = typeof req.body.originalFilename === "string" ? req.body.originalFilename.trim() : "";
@@ -248,7 +227,7 @@ router.patch("/:id", (req, res) => {
 // of server-side data this way. Only RECORDINGS_RETENTION_DAYS expiry
 // (serve.js's pruneExpiredRecordings) actually removes anything.
 router.delete("/:id", (req, res) => {
-    const recording = getVisibleById(req.params.id);
+    const recording = recordingsRepo.getVisibleById(req.params.id);
     if (!recording) return res.status(404).json({ error: "Recording not found", requestId: req.id });
 
     recordingsRepo.hide(req.params.id);

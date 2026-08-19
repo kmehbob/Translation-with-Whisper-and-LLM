@@ -7,7 +7,7 @@ function concurrencyGuard(limit, busyMessage) {
     let inFlight = 0;
     return function (req, res, next) {
         if (inFlight >= limit) {
-            return res.status(503).json({ error: busyMessage || "Server is busy, please try again shortly" });
+            return res.status(503).json({ error: busyMessage || "Server is busy, please try again shortly", requestId: req.id });
         }
         inFlight += 1;
         // Node fires both 'finish' and 'close' for a normal completed

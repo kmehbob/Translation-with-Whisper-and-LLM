@@ -9,7 +9,7 @@ function makeLimiter(max, message) {
         legacyHeaders: false,
         message: { error: message },
         handler: (req, res, _next, options) => {
-            res.status(options.statusCode).json(options.message);
+            res.status(options.statusCode).json({ ...options.message, requestId: req.id });
         },
     });
 }

@@ -1,4 +1,5 @@
 const recordingsRepo = require("../lib/recordingsRepo");
+const db = require("../lib/db");
 
 function makeRecording(overrides = {}) {
     return recordingsRepo.create({
@@ -91,4 +92,18 @@ test("pruneExpired removes only rows older than the retention window and returns
     expect(recordingsRepo.pruneExpired(0)).toEqual([]);
     expect(recordingsRepo.pruneExpired(365)).toEqual([]);
     expect(recordingsRepo.getById(rec.id)).not.toBeNull();
+});
+
+test("pruneExpired actually deletes rows older than the retention window, and only those", () => {
+    const old = makeRecording();
+    const recent = makeRecording();
+
+    const oldIso = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+    db.prepare("UPDATE recordings SET created_at = ? WHERE id = ?").run(oldIso, old.id);
+
+    const expired = recordingsRepo.pruneExpired(5);
+
+    expect(expired.map((r) => r.id)).toEqual([old.id]);
+    expect(recordingsRepo.getById(old.id)).toBeNull();
+    expect(recordingsRepo.getById(recent.id)).not.toBeNull();
 });

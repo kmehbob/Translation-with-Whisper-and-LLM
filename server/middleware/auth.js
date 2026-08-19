@@ -23,7 +23,7 @@ function requireClientApiKey(req, res, next) {
 
     const provided = req.headers["x-api-key"];
     if (!config.clientApiKey || typeof provided !== "string" || !safeEqual(provided, config.clientApiKey)) {
-        return res.status(401).json({ error: "Unauthorized" });
+        return res.status(401).json({ error: "Unauthorized", requestId: req.id });
     }
     next();
 }

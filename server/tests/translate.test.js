@@ -7,6 +7,19 @@ const mockRequest = jest.fn();
 axios.create.mockReturnValue({ request: mockRequest, get: jest.fn() });
 
 const app = require("../serve.js");
+const recordingsRepo = require("../lib/recordingsRepo");
+
+function seedRecording(overrides = {}) {
+    return recordingsRepo.create({
+        sourceType: "recorded",
+        originalFilename: "call.wav",
+        storedFilename: `${overrides.id || "seed"}.mp3`,
+        mimeType: "audio/mpeg",
+        fileSizeBytes: 4096,
+        sourceLanguage: "ur",
+        ...overrides,
+    });
+}
 
 beforeEach(() => {
     mockRequest.mockReset();
@@ -131,10 +144,72 @@ describe("POST /api/v1/translate", () => {
         expect(JSON.stringify(res.body)).not.toMatch(/etc\/secret/);
     });
 
+    test("returns 400 (not 500) for a malformed JSON body", async () => {
+        const res = await request(app)
+            .post("/api/v1/translate")
+            .set("Content-Type", "application/json")
+            .send("{not valid json");
+
+        expect(res.status).toBe(400);
+        expect(mockRequest).not.toHaveBeenCalled();
+    });
+
     test("includes a request ID on both success and error responses", async () => {
         mockRequest.mockResolvedValue({ status: 200, data: { translation: "Hi" } });
         const res = await request(app).post("/api/v1/translate").send({ text: "سلام" });
         expect(res.body.requestId).toBeTruthy();
         expect(res.headers["x-request-id"]).toBeTruthy();
+    });
+
+    describe("recordingId attachment", () => {
+        test("attaches a successful translation to the given recording", async () => {
+            const rec = seedRecording();
+            mockRequest.mockResolvedValue({ status: 200, data: { translation: "Hello there" } });
+
+            const res = await request(app)
+                .post("/api/v1/translate")
+                .send({ text: "ہیلو", recordingId: rec.id, targetLanguage: "en" });
+
+            expect(res.status).toBe(200);
+            expect(res.body.recordingId).toBe(rec.id);
+
+            const stored = recordingsRepo.getById(rec.id);
+            expect(stored.status).toBe("completed");
+            expect(stored.translation_text).toBe("Hello there");
+            expect(stored.target_language).toBe("en");
+        });
+
+        test("marks the recording failed when the translation service errors", async () => {
+            const rec = seedRecording();
+            mockRequest.mockRejectedValue(new Error("boom"));
+
+            const res = await request(app).post("/api/v1/translate").send({ text: "ہیلو", recordingId: rec.id });
+
+            expect(res.status).toBe(502);
+            const stored = recordingsRepo.getById(rec.id);
+            expect(stored.status).toBe("failed");
+            expect(stored.error_message).toBeTruthy();
+        });
+
+        test("404s for an unknown recordingId without calling the translation service", async () => {
+            const res = await request(app)
+                .post("/api/v1/translate")
+                .send({ text: "ہیلو", recordingId: "does-not-exist" });
+
+            expect(res.status).toBe(404);
+            expect(mockRequest).not.toHaveBeenCalled();
+        });
+
+        test("404s for a hidden (soft-deleted) recordingId instead of silently translating it", async () => {
+            const rec = seedRecording();
+            recordingsRepo.hide(rec.id);
+
+            const res = await request(app).post("/api/v1/translate").send({ text: "ہیلو", recordingId: rec.id });
+
+            expect(res.status).toBe(404);
+            expect(mockRequest).not.toHaveBeenCalled();
+            // The hidden row must stay untouched by the rejected request.
+            expect(recordingsRepo.getById(rec.id).status).toBe("pending");
+        });
     });
 });

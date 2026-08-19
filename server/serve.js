@@ -18,6 +18,22 @@ const audioConvertRouter = require("./routes/audioConvert");
 const recordingsRepo = require("./lib/recordingsRepo");
 const audioStorage = require("./lib/audioStorage");
 
+// Loud (not fatal - this app has always shipped as an unauthenticated
+// public tool by default) warning when running in production with the
+// permissive development defaults still in place, so a real deployment
+// doesn't silently go live wide open.
+if (config.nodeEnv === "production") {
+    if (!config.internalServiceToken) {
+        logger.warn("insecure_production_config", { issue: "INTERNAL_SERVICE_TOKEN is not set" });
+    }
+    if (!config.requireClientApiKey) {
+        logger.warn("insecure_production_config", { issue: "REQUIRE_CLIENT_API_KEY is false - transcribe/translate/recordings endpoints are unauthenticated" });
+    }
+    if (!config.internalTlsEnabled) {
+        logger.warn("insecure_production_config", { issue: "INTERNAL_TLS_ENABLED is false - gateway<->AI-service traffic is unencrypted" });
+    }
+}
+
 const app = express();
 
 app.disable("x-powered-by");

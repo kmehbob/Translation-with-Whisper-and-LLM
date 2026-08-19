@@ -9,6 +9,7 @@ const concurrencyGuard = require("../lib/concurrencyGuard");
 const { transcribeLimiter } = require("../lib/rateLimiters");
 const { requireClientApiKey } = require("../middleware/auth");
 const audioStorage = require("../lib/audioStorage");
+const { deleteTransientFile } = require("../lib/tempFile");
 
 const router = express.Router();
 
@@ -68,17 +69,6 @@ const upload = multer({
     limits: { fileSize: config.maxAudioUploadMb * 1024 * 1024 },
 });
 
-async function deleteTransientFile(filePath) {
-    if (!filePath) return;
-    try {
-        await fs.promises.unlink(filePath);
-    } catch (err) {
-        if (err.code !== "ENOENT") {
-            logger.warn("temp_convert_file_delete_failed", { code: err.code });
-        }
-    }
-}
-
 // Pure format-normalization utility: converts whatever audio format the
 // browser recorded/uploaded into MP3 and streams it straight back.
 // Deliberately does NOT transcribe it or create a persistent recording -
@@ -87,8 +77,8 @@ async function deleteTransientFile(filePath) {
 // available even when ENABLE_AI_FEATURES=false.
 router.post(
     "/mp3",
-    transcribeLimiter,
     requireClientApiKey,
+    transcribeLimiter,
     concurrencyGuard(config.maxConcurrentTranscribeRequests, "Server is busy converting audio, please try again shortly"),
     (req, res, next) => {
         upload.single("file")(req, res, (err) => {
@@ -114,17 +104,17 @@ router.post(
             res.setHeader("Content-Type", "audio/mpeg");
             res.setHeader("Content-Disposition", 'attachment; filename="recording.mp3"');
             fs.createReadStream(converted.storedPath)
-                .on("close", () => deleteTransientFile(converted.storedPath))
+                .on("close", () => deleteTransientFile(converted.storedPath, "temp_convert_file_delete_failed"))
                 .on("error", (err) => {
                     logger.error("mp3_convert_stream_failed", { requestId: req.id });
-                    deleteTransientFile(converted.storedPath);
+                    deleteTransientFile(converted.storedPath, "temp_convert_file_delete_failed");
                     if (!res.headersSent) next(err);
                 })
                 .pipe(res);
         } catch (err) {
             next(err);
         } finally {
-            await deleteTransientFile(uploadedPath);
+            await deleteTransientFile(uploadedPath, "temp_convert_file_delete_failed");
         }
     }
 );

@@ -137,15 +137,18 @@ button { cursor: pointer; }
 
 a { color: var(--primary); }
 
-/* Nastaliq's diagonal stress and stacked diacritics need noticeably more
-   vertical room and a slightly larger size than Latin text to stay legible -
-   the tight line-height/size that works for --font-sans clips it.
-   `body` sets its own font-family below, which otherwise wins over the
+/* `body` sets its own font-family/size below, which otherwise wins over the
    [dir="rtl"] rule on <html> for everything inheriting from body (i.e.
    nearly the whole page) - so the Urdu interface needs its own, more
-   specific override to actually apply the Urdu font past body. */
-[dir="rtl"] { font-family: var(--font-urdu), var(--font-sans); font-size: 13px; line-height: 1.8; }
-html[dir="rtl"] body { font-family: var(--font-urdu), var(--font-sans); font-size: 13px; line-height: 1.8; }
+   specific override to actually apply the Urdu font/size past body.
+   Line-height is deliberately NOT bumped here: it's inherited by every
+   short one-line piece of UI chrome too (buttons, badges, pills, table
+   cells), so a blanket increase changed the visual rhythm of the entire
+   app, not just actual Nastaliq prose. Only .script-rtl (real multi-line
+   Urdu text - the transcription field) gets the taller line-height it
+   actually needs for Nastaliq's diagonal stress and stacked diacritics. */
+[dir="rtl"] { font-family: var(--font-urdu), var(--font-sans); font-size: 13px; }
+html[dir="rtl"] body { font-family: var(--font-urdu), var(--font-sans); font-size: 13px; }
 
 .script-rtl { direction: rtl; text-align: right; font-family: var(--font-urdu), var(--font-sans); line-height: 1.8; }
 .script-ltr { direction: ltr; text-align: left; font-family: var(--font-sans); }
@@ -548,8 +551,6 @@ main { display: block; }
 .banner svg { width: 20px; height: 20px; flex-shrink: 0; margin-top: 1px; }
 
 .banner-error { background: var(--danger-soft); color: var(--danger); align-items: center; }
-.banner-success { background: var(--success-soft); color: var(--success); }
-.banner-info { background: var(--info-soft); color: var(--info); }
 
 @keyframes banner-in {
     from { opacity: 0; transform: translateY(-6px); }
@@ -832,8 +833,6 @@ main { display: block; }
     font-variant-numeric: tabular-nums;
     font-family: var(--font-sans);
 }
-
-.recording-time { color: var(--danger); font-weight: 700; }
 
 #recordingTime.time-warning { color: var(--warning); }
 
@@ -1135,13 +1134,6 @@ main { display: block; }
     .workspace-panels[data-active="translation"] .panel-transcription { display: none; }
 }
 
-.status-text {
-    font-size: 12.5px;
-    font-weight: 600;
-    color: var(--text-muted);
-    margin: 6px 0;
-    min-height: 20px;
-}
 
 .spinner {
     display: inline-block;
@@ -1536,7 +1528,7 @@ main { display: block; }
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 10px;
-    margin-top: 10px;
+    margin-bottom: 5px;
 }
 
 .pagination-controls { display: flex; align-items: center; gap: 6px; }

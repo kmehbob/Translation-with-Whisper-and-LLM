@@ -14,8 +14,8 @@ const translationClient = createServiceClient(config.translationServiceUrl, conf
 
 router.post(
     "/",
-    translateLimiter,
     requireClientApiKey,
+    translateLimiter,
     concurrencyGuard(config.maxConcurrentTranslateRequests, "Translation service is busy, please try again shortly"),
     async (req, res, next) => {
         const startedAt = Date.now();
@@ -40,7 +40,9 @@ router.post(
 
         let recording = null;
         if (recordingId) {
-            recording = recordingsRepo.getById(recordingId);
+            // getVisibleById (not getById) so a "deleted" (hidden) recording
+            // can't be silently re-translated via a replayed/guessed id.
+            recording = recordingsRepo.getVisibleById(recordingId);
             if (!recording) {
                 return res.status(404).json({ error: "Recording not found", requestId: req.id });
             }

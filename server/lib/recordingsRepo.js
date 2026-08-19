@@ -60,6 +60,15 @@ function getById(id) {
     return db.prepare("SELECT * FROM recordings WHERE id = ?").get(id) || null;
 }
 
+// A hidden (user-"deleted") recording is treated as gone everywhere a single
+// recordingId is looked up directly - not just list() - so a client that
+// still holds (or replays) a deleted recording's id can't keep transcribing/
+// translating/renaming/exporting it after the user believed it was deleted.
+function getVisibleById(id) {
+    const recording = getById(id);
+    return recording && !recording.hidden ? recording : null;
+}
+
 function remove(id) {
     const result = db.prepare("DELETE FROM recordings WHERE id = ?").run(id);
     return result.changes > 0;
@@ -149,4 +158,4 @@ function pruneExpired(retentionDays) {
     return expired;
 }
 
-module.exports = { create, update, getById, remove, hide, restoreHiddenByDateRange, list, pruneExpired };
+module.exports = { create, update, getById, getVisibleById, remove, hide, restoreHiddenByDateRange, list, pruneExpired };

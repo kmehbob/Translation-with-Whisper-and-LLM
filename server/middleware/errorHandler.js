@@ -17,6 +17,16 @@ function errorHandler(err, req, res, _next) {
         return res.status(413).json({ error: "Request payload too large", requestId });
     }
 
+    // body-parser (express.json/urlencoded) reports malformed request bodies
+    // as a generic Error with a `status`/`statusCode` in the 400s and a
+    // `type` like "entity.parse.failed" - without this check they fell
+    // through to the generic 500 branch below, misreporting a client error
+    // as a server error.
+    if (err && (err.type === "entity.parse.failed" || (err.status >= 400 && err.status < 500) || (err.statusCode >= 400 && err.statusCode < 500))) {
+        const status = err.status || err.statusCode;
+        return res.status(status).json({ error: "Malformed request body", requestId });
+    }
+
     logger.error("unhandled_error", { requestId, path: req.path, name: err?.name });
     res.status(500).json({ error: "Internal server error", requestId });
 }

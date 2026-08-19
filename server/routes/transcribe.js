@@ -12,6 +12,7 @@ const { requireClientApiKey } = require("../middleware/auth");
 const { createServiceClient, callService } = require("../lib/serviceClient");
 const audioStorage = require("../lib/audioStorage");
 const recordingsRepo = require("../lib/recordingsRepo");
+const { deleteTransientFile } = require("../lib/tempFile");
 
 const router = express.Router();
 
@@ -75,35 +76,10 @@ const upload = multer({
 
 const transcriptionClient = createServiceClient(config.transcriptionServiceUrl, config.transcribeTimeoutMs);
 
-async function deleteTransientFile(filePath) {
-    if (!filePath) return;
-    // On some platforms (notably Windows) a file can't be unlinked while a
-    // read stream against it is still releasing its handle, so a transient
-    // EBUSY/EPERM right after use is expected - retry briefly before giving
-    // up and logging. This is the short-lived upload/conversion staging
-    // file, not the permanent recording (see docs/AI_FEATURE.md for the
-    // data-retention policy: uploads/ is always transient, recordings/ persists).
-    const maxAttempts = 5;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-            await fs.promises.unlink(filePath);
-            return;
-        } catch (err) {
-            if (err.code === "ENOENT") return;
-            const retryable = err.code === "EBUSY" || err.code === "EPERM";
-            if (!retryable || attempt === maxAttempts) {
-                logger.warn("temp_audio_delete_failed", { code: err.code });
-                return;
-            }
-            await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
-        }
-    }
-}
-
 router.post(
     "/",
-    transcribeLimiter,
     requireClientApiKey,
+    transcribeLimiter,
     concurrencyGuard(config.maxConcurrentTranscribeRequests, "Transcription service is busy, please try again shortly"),
     (req, res, next) => {
         upload.single("file")(req, res, (err) => {
@@ -124,6 +100,7 @@ router.post(
         const existingRecordingId = req.body.recordingId ? String(req.body.recordingId) : null;
 
         let recording = null;
+        let converted = null;
 
         try {
             if (existingRecordingId) {
@@ -131,7 +108,9 @@ router.post(
                 // e.g. as soon as a recording/upload completed, before the user
                 // ever pressed "Transcribe audio") - reuse that stored MP3
                 // in place instead of uploading and converting it a second time.
-                recording = recordingsRepo.getById(existingRecordingId);
+                // getVisibleById (not getById) so a "deleted" (hidden) recording
+                // can't be silently re-transcribed via a replayed/guessed id.
+                recording = recordingsRepo.getVisibleById(existingRecordingId);
                 if (!recording) {
                     return res.status(404).json({ error: "Recording not found", requestId: req.id });
                 }
@@ -147,7 +126,7 @@ router.post(
                 // Every recording is normalized to MP3 for permanent storage,
                 // regardless of the format it arrived in (webm from the
                 // browser recorder, or any of the uploadable formats above).
-                const converted = await audioStorage.convertToMp3(uploadedPath);
+                converted = await audioStorage.convertToMp3(uploadedPath);
                 const durationSeconds = await audioStorage.probeDurationSeconds(converted.storedPath);
 
                 recording = recordingsRepo.create({
@@ -208,10 +187,16 @@ router.post(
                     status: "failed",
                     error_message: err.publicMessage || "Transcription failed",
                 });
+            } else if (converted) {
+                // The MP3 was already written to permanent storage before
+                // recordingsRepo.create() threw - with no DB row pointing at
+                // it, pruneExpired (which only looks at DB rows) would never
+                // clean it up, leaking disk space forever.
+                await deleteTransientFile(converted.storedPath, "orphaned_recording_delete_failed");
             }
             next(err);
         } finally {
-            await deleteTransientFile(uploadedPath);
+            await deleteTransientFile(uploadedPath, "temp_audio_delete_failed");
         }
     }
 );
