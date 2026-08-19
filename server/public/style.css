@@ -137,10 +137,15 @@ button { cursor: pointer; }
 
 a { color: var(--primary); }
 
-[dir="rtl"] { font-family: var(--font-urdu), var(--font-sans); }
+/* Nastaliq's diagonal stress and stacked diacritics need noticeably more
+   vertical room and a slightly larger size than Latin text to stay legible -
+   the tight line-height/size that works for --font-sans clips it. */
+[dir="rtl"] { font-family: var(--font-urdu), var(--font-sans); line-height: 1.9; }
 
-.script-rtl { direction: rtl; text-align: right; font-family: var(--font-urdu), var(--font-sans); }
+.script-rtl { direction: rtl; text-align: right; font-family: var(--font-urdu), var(--font-sans); line-height: 1.9; }
 .script-ltr { direction: ltr; text-align: left; font-family: var(--font-sans); }
+
+.panel textarea.script-rtl { font-size: 17px; line-height: 2.1; }
 
 .hidden { display: none !important; }
 
@@ -1048,6 +1053,11 @@ main { display: block; }
 .panel textarea::placeholder {
     color: var(--text-faint);
     line-height: 1.6;
+}
+
+.panel textarea.script-rtl::placeholder {
+    font-family: var(--font-urdu), var(--font-sans);
+    line-height: 2.1;
 }
 
 /* While empty, give the placeholder some breathing room and a small icon
