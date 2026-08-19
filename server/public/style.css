@@ -144,13 +144,13 @@ a { color: var(--primary); }
    [dir="rtl"] rule on <html> for everything inheriting from body (i.e.
    nearly the whole page) - so the Urdu interface needs its own, more
    specific override to actually apply the Urdu font past body. */
-[dir="rtl"] { font-family: var(--font-urdu), var(--font-sans); line-height: 1.9; }
-html[dir="rtl"] body { font-family: var(--font-urdu), var(--font-sans); line-height: 1.9; }
+[dir="rtl"] { font-family: var(--font-urdu), var(--font-sans); font-size: 13px; line-height: 1.8; }
+html[dir="rtl"] body { font-family: var(--font-urdu), var(--font-sans); font-size: 13px; line-height: 1.8; }
 
-.script-rtl { direction: rtl; text-align: right; font-family: var(--font-urdu), var(--font-sans); line-height: 1.9; }
+.script-rtl { direction: rtl; text-align: right; font-family: var(--font-urdu), var(--font-sans); line-height: 1.8; }
 .script-ltr { direction: ltr; text-align: left; font-family: var(--font-sans); }
 
-.panel textarea.script-rtl { font-size: 17px; line-height: 2.1; }
+.panel textarea.script-rtl { font-size: 15px; line-height: 1.9; }
 
 .hidden { display: none !important; }
 
@@ -612,7 +612,7 @@ main { display: block; }
 
 .live-col-input, .live-col-workspace { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 
-.live-col-scroll { display: flex; flex-direction: column; gap: 12px; }
+.live-col-scroll { display: flex; flex-direction: column; gap: 6px; }
 
 /* Record/Upload input-method switch - upload stays out of the way until
    the user actually wants it. */
@@ -1062,7 +1062,7 @@ main { display: block; }
 
 .panel textarea.script-rtl::placeholder {
     font-family: var(--font-urdu), var(--font-sans);
-    line-height: 2.1;
+    line-height: 1.9;
 }
 
 /* While empty, give the placeholder some breathing room and a small icon
@@ -1120,13 +1120,13 @@ main { display: block; }
 }
 
 @media (min-width: 640px) {
-    .panel-transcription { order: 2; }
-    .panel-translation { order: 1; }
+    .panel-transcription { order: 1; }
+    .panel-translation { order: 2; }
 }
 
 @media (min-width: 960px) {
     .workspace-panels { grid-template-columns: 1fr 1fr; gap: 24px; }
-    .panel-transcription { padding-inline-start: 12px; border-inline-start: 1px solid var(--border); }
+    .panel-translation { padding-inline-start: 12px; border-inline-start: 1px solid var(--border); }
 }
 
 @media (max-width: 639.98px) {
