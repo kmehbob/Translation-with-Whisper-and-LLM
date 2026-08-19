@@ -362,6 +362,14 @@ function applyI18n() {
     renderWorkspaceTabLabels();
     updateTranscriptionWordCount();
     updateTranslationWordCount();
+
+    // Table/card rows bake translated text (source, status, relative time)
+    // in at build time, so a language switch while History is already open
+    // needs a rebuild - otherwise rows stay in whatever language they were
+    // last rendered in until the next unrelated refresh.
+    if (!tabHistory.classList.contains("hidden")) {
+        loadHistory();
+    }
 }
 
 function setInterfaceLanguage(lang) {

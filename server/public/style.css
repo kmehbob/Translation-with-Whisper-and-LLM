@@ -139,8 +139,13 @@ a { color: var(--primary); }
 
 /* Nastaliq's diagonal stress and stacked diacritics need noticeably more
    vertical room and a slightly larger size than Latin text to stay legible -
-   the tight line-height/size that works for --font-sans clips it. */
+   the tight line-height/size that works for --font-sans clips it.
+   `body` sets its own font-family below, which otherwise wins over the
+   [dir="rtl"] rule on <html> for everything inheriting from body (i.e.
+   nearly the whole page) - so the Urdu interface needs its own, more
+   specific override to actually apply the Urdu font past body. */
 [dir="rtl"] { font-family: var(--font-urdu), var(--font-sans); line-height: 1.9; }
+html[dir="rtl"] body { font-family: var(--font-urdu), var(--font-sans); line-height: 1.9; }
 
 .script-rtl { direction: rtl; text-align: right; font-family: var(--font-urdu), var(--font-sans); line-height: 1.9; }
 .script-ltr { direction: ltr; text-align: left; font-family: var(--font-sans); }
@@ -179,7 +184,7 @@ a { color: var(--primary); }
 
 main { display: block; }
 
-.tab-panel { padding-top: 12px; }
+.tab-panel { padding: 8px 0px; }
 
 /* ==========================================================================
    Header
