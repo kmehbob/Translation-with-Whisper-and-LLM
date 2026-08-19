@@ -79,6 +79,10 @@ const UI_STRINGS = {
         wordCountLabel: "Word count: {n}",
         copiedLabel: "Copied!",
         copyErrorToast: "Could not copy text.",
+        modeEdit: "Edit",
+        modeCopy: "Copy",
+        copyModeHint: "Click the text to copy it",
+        fieldCopiedToast: "Copied to clipboard.",
         transcriptionPanelTitleTpl: "{lang} transcription",
         translationPanelTitleTpl: "{lang} translation",
         transcribingStatus: "Transcribing…",
@@ -223,6 +227,10 @@ const UI_STRINGS = {
         wordCountLabel: "الفاظ کی تعداد: {n}",
         copiedLabel: "کاپی ہو گیا!",
         copyErrorToast: "متن کاپی کرنے میں خرابی۔",
+        modeEdit: "ترمیم",
+        modeCopy: "کاپی",
+        copyModeHint: "کاپی کرنے کے لیے متن پر کلک کریں",
+        fieldCopiedToast: "کلپ بورڈ پر کاپی ہو گیا۔",
         transcriptionPanelTitleTpl: "{lang} ٹرانسکرپشن",
         translationPanelTitleTpl: "{lang} ترجمہ",
         transcribingStatus: "ٹرانسکرائب ہو رہا ہے…",
@@ -442,6 +450,10 @@ const urduText = document.getElementById("urduText");
 const englishText = document.getElementById("englishText");
 const copyUrduBtn = document.getElementById("copyUrduBtn");
 const copyEnglishBtn = document.getElementById("copyEnglishBtn");
+const transcriptionModeEditBtn = document.getElementById("transcriptionModeEditBtn");
+const transcriptionModeCopyBtn = document.getElementById("transcriptionModeCopyBtn");
+const transcriptionCopyHint = document.getElementById("transcriptionCopyHint");
+const translationCopyHint = document.getElementById("translationCopyHint");
 const saveAudioBtn = document.getElementById("saveAudioBtn");
 const translateBtn = document.getElementById("translateBtn");
 const translateBtnLabel = document.getElementById("translateBtnLabel");
@@ -633,6 +645,15 @@ function activateTab(name) {
 
 tabBtnCreate.addEventListener("click", () => activateTab("create"));
 tabBtnHistory.addEventListener("click", () => activateTab("history"));
+
+const brandHomeBtn = document.getElementById("brandHomeBtn");
+brandHomeBtn.addEventListener("click", () => activateTab("create"));
+brandHomeBtn.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        activateTab("create");
+    }
+});
 
 // ============================================================================
 // Interface language toggle
@@ -917,6 +938,7 @@ function markTranslationStale() {
         staleNotice.classList.remove("hidden");
     }
     copyEnglishBtn.disabled = true;
+    updateTranslationCopyHint();
     setExportButtonsEnabled(false);
 }
 
@@ -925,6 +947,7 @@ function clearTranslationState() {
     updateTranslationWordCount();
     staleNotice.classList.add("hidden");
     copyEnglishBtn.disabled = true;
+    updateTranslationCopyHint();
     setExportButtonsEnabled(false);
 }
 
@@ -975,6 +998,59 @@ copyUrduBtn.addEventListener("click", function () {
 copyEnglishBtn.addEventListener("click", function () {
     if (copyEnglishBtn.disabled) return;
     copyToClipboard(englishText.value, copyEnglishBtn);
+});
+
+// ============================================================================
+// Edit / Copy mode - lets the whole transcription field become a single
+// "click anywhere to copy" target instead of requiring a manual drag-select,
+// which is fiddly for RTL/mixed text and long transcripts. The translation
+// field is always read-only, so it's always click-to-copy with no toggle.
+// ============================================================================
+function copyFieldToClipboard(textarea) {
+    const text = textarea.value;
+    if (!text || !text.trim()) return;
+    navigator.clipboard.writeText(text)
+        .then(function () {
+            textarea.classList.remove("just-copied");
+            void textarea.offsetWidth; // restart the flash animation on repeat clicks
+            textarea.classList.add("just-copied");
+            showToast(t("fieldCopiedToast"), "success");
+        })
+        .catch(function (err) {
+            logDebug("Error copying text: " + err);
+            showToast(t("copyErrorToast"), "error");
+        });
+}
+
+function setTranscriptionMode(mode) {
+    const isCopyMode = mode === "copy";
+    transcriptionModeEditBtn.classList.toggle("active", !isCopyMode);
+    transcriptionModeEditBtn.setAttribute("aria-pressed", String(!isCopyMode));
+    transcriptionModeCopyBtn.classList.toggle("active", isCopyMode);
+    transcriptionModeCopyBtn.setAttribute("aria-pressed", String(isCopyMode));
+    urduText.classList.toggle("copy-mode", isCopyMode);
+    urduText.readOnly = isCopyMode;
+    transcriptionCopyHint.classList.toggle("hidden", !isCopyMode);
+}
+
+transcriptionModeEditBtn.addEventListener("click", function () { setTranscriptionMode("edit"); });
+transcriptionModeCopyBtn.addEventListener("click", function () { setTranscriptionMode("copy"); });
+setTranscriptionMode("copy");
+
+urduText.addEventListener("click", function () {
+    if (!urduText.classList.contains("copy-mode")) return;
+    urduText.select();
+    copyFieldToClipboard(urduText);
+});
+
+function updateTranslationCopyHint() {
+    translationCopyHint.classList.toggle("hidden", !englishText.value.trim());
+}
+
+englishText.addEventListener("click", function () {
+    if (!englishText.value.trim()) return;
+    englishText.select();
+    copyFieldToClipboard(englishText);
 });
 
 saveAudioBtn.addEventListener("click", function () {
@@ -1115,6 +1191,7 @@ function triggerTranslate() {
             if (urduText.value.trim() === text) {
                 staleNotice.classList.add("hidden");
                 copyEnglishBtn.disabled = !englishText.value.trim();
+                updateTranslationCopyHint();
                 setExportButtonsEnabled(Boolean(currentRecordingId && englishText.value.trim()));
                 englishText.focus();
                 showToast(t("translationCompleteToast"), "success");
