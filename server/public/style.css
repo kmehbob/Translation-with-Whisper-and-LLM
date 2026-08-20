@@ -826,10 +826,10 @@ main { display: block; }
 .recording-active .visualizer-hint { opacity: 0; }
 
 .record-time-row {
-    margin-top: 12px;
+    margin-top: 4px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 2px;
     font-size: 13px;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
