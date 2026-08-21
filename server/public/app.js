@@ -45,24 +45,11 @@ const UI_STRINGS = {
         removeFileAria: "Remove",
         mp3ConvertFailed: "Could not convert this recording to MP3.",
         mp3DownloadError: "MP3 download failed: {msg}",
-        renameAudioAria: "Rename",
         closeAria: "Close",
         openAria: "Open",
-        deleteAria: "Delete",
-        selectAllAria: "Select all",
-        selectRecordingAria: "Select recording",
         modalCancel: "Cancel",
         modalConfirm: "OK",
         modalConfirmTitle: "Confirm",
-        modalDeleteTitle: "Delete recording",
-        modalDeleteConfirm: "Delete",
-        renamePrompt: "Rename this recording",
-        renameSuccess: "Recording renamed.",
-        renameError: "Could not rename: {msg}",
-        restoreForPeriod: "Restore deleted for this period",
-        restoreSuccess: "{n} recording(s) restored.",
-        restoreNone: "No deleted recordings found in that period.",
-        restoreError: "Could not restore: {msg}",
         sourceLabel: "Source language",
         targetLabel: "Target language",
         transcribeBtn: "Transcribe audio",
@@ -154,18 +141,8 @@ const UI_STRINGS = {
         nextBtn: "Next",
         detailTitle: "Recording detail",
         detailLoadError: "Could not load recording detail: {msg}",
-        deleteBtn: "Delete",
-        deleteConfirm: "Are you sure you want to delete this recording?",
-        deletedToast: "Recording deleted.",
-        deleteError: "Could not delete recording: {msg}",
         untitled: "(untitled)",
         exportHistoryEmpty: "No recordings to export.",
-        bulkSelectedCount: "{n} selected",
-        bulkClearSelection: "Clear selection",
-        bulkDeleteSelected: "Delete selected",
-        bulkDeleteConfirm: "Delete {n} selected recording(s)? This cannot be undone.",
-        bulkDeleteSuccess: "{n} recording(s) deleted.",
-        bulkDeletePartial: "{succeeded} deleted, {failed} failed.",
         downloadAudioAria: "Download audio",
     },
     ur: {
@@ -210,24 +187,11 @@ const UI_STRINGS = {
         removeFileAria: "ہٹا دیں",
         mp3ConvertFailed: "اس ریکارڈنگ کو MP3 میں تبدیل نہیں کیا جا سکا۔",
         mp3DownloadError: "MP3 ڈاؤن لوڈ ناکام: {msg}",
-        renameAudioAria: "نام تبدیل کریں",
         closeAria: "بند کریں",
         openAria: "کھولیں",
-        deleteAria: "حذف کریں",
-        selectAllAria: "سب منتخب کریں",
-        selectRecordingAria: "ریکارڈنگ منتخب کریں",
         modalCancel: "منسوخ کریں",
         modalConfirm: "ٹھیک ہے",
         modalConfirmTitle: "تصدیق کریں",
-        modalDeleteTitle: "ریکارڈنگ حذف کریں",
-        modalDeleteConfirm: "حذف کریں",
-        renamePrompt: "اس ریکارڈنگ کا نام تبدیل کریں",
-        renameSuccess: "ریکارڈنگ کا نام تبدیل کر دیا گیا۔",
-        renameError: "نام تبدیل نہیں ہو سکا: {msg}",
-        restoreForPeriod: "اس مدت کی حذف شدہ ریکارڈنگز بحال کریں",
-        restoreSuccess: "{n} ریکارڈنگز بحال کر دی گئیں۔",
-        restoreNone: "اس مدت میں کوئی حذف شدہ ریکارڈنگ نہیں ملی۔",
-        restoreError: "بحال نہیں ہو سکا: {msg}",
         sourceLabel: "ماخذ زبان",
         targetLabel: "ہدف زبان",
         transcribeBtn: "آڈیو ٹرانسکرائب کریں",
@@ -319,18 +283,8 @@ const UI_STRINGS = {
         nextBtn: "اگلا",
         detailTitle: "ریکارڈنگ کی تفصیل",
         detailLoadError: "تفصیل لوڈ کرنے میں خرابی: {msg}",
-        deleteBtn: "حذف کریں",
-        deleteConfirm: "کیا آپ واقعی اس ریکارڈنگ کو حذف کرنا چاہتے ہیں؟",
-        deletedToast: "ریکارڈنگ حذف کر دی گئی۔",
-        deleteError: "حذف کرنے میں خرابی: {msg}",
         untitled: "(بلا عنوان)",
         exportHistoryEmpty: "ایکسپورٹ کے لیے کوئی ریکارڈنگ نہیں۔",
-        bulkSelectedCount: "{n} منتخب",
-        bulkClearSelection: "انتخاب صاف کریں",
-        bulkDeleteSelected: "منتخب حذف کریں",
-        bulkDeleteConfirm: "کیا آپ {n} منتخب ریکارڈنگز حذف کرنا چاہتے ہیں؟ اسے واپس نہیں لیا جا سکتا۔",
-        bulkDeleteSuccess: "{n} ریکارڈنگز حذف کر دی گئیں۔",
-        bulkDeletePartial: "{succeeded} حذف ہوئیں، {failed} ناکام رہیں۔",
         downloadAudioAria: "آڈیو ڈاؤن لوڈ کریں",
     },
 };
@@ -1891,87 +1845,17 @@ const historyPageNumbers = document.getElementById("historyPageNumbers");
 const historyDetailOverlay = document.getElementById("historyDetailOverlay");
 const historyDetail = document.getElementById("historyDetail");
 const historyDetailClose = document.getElementById("historyDetailClose");
-const historyDetailRenameBtn = document.getElementById("historyDetailRenameBtn");
 const historyAudioPlayer = document.getElementById("historyAudioPlayer");
 const historyTranscriptionText = document.getElementById("historyTranscriptionText");
 const historyTranslationText = document.getElementById("historyTranslationText");
-const historyDeleteBtn = document.getElementById("historyDeleteBtn");
 const filtersToggleBtn = document.getElementById("filtersToggleBtn");
 const filtersCollapse = document.getElementById("filtersCollapse");
 const filtersBadge = document.getElementById("filtersBadge");
 const filtersCount = document.getElementById("filtersCount");
 const historyClearBtn = document.getElementById("historyClearBtn");
-const historyRestoreBtn = document.getElementById("historyRestoreBtn");
 const exportHistoryBtn = document.getElementById("exportHistoryBtn");
-const historySelectAllCheckbox = document.getElementById("historySelectAllCheckbox");
-const historyBulkBar = document.getElementById("historyBulkBar");
-const historyBulkCount = document.getElementById("historyBulkCount");
-const historyBulkDeleteBtn = document.getElementById("historyBulkDeleteBtn");
-const historyBulkClearBtn = document.getElementById("historyBulkClearBtn");
 
-let selectedRecordingIds = new Set();
 let currentPageItems = [];
-
-function updateBulkBar() {
-    const n = selectedRecordingIds.size;
-    historyBulkBar.classList.toggle("hidden", n === 0);
-    historyBulkCount.textContent = t("bulkSelectedCount", { n });
-    if (currentPageItems.length > 0) {
-        historySelectAllCheckbox.checked = currentPageItems.every((item) => selectedRecordingIds.has(item.id));
-        historySelectAllCheckbox.indeterminate = n > 0 && !historySelectAllCheckbox.checked;
-    } else {
-        historySelectAllCheckbox.checked = false;
-        historySelectAllCheckbox.indeterminate = false;
-    }
-}
-
-function toggleRowSelection(id, checked) {
-    if (checked) selectedRecordingIds.add(id);
-    else selectedRecordingIds.delete(id);
-    document.querySelectorAll(`input.row-checkbox[data-id="${id}"], input.card-checkbox[data-id="${id}"]`)
-        .forEach((el) => { el.checked = checked; });
-    updateBulkBar();
-}
-
-historySelectAllCheckbox.addEventListener("change", () => {
-    const checked = historySelectAllCheckbox.checked;
-    for (const item of currentPageItems) {
-        if (checked) selectedRecordingIds.add(item.id);
-        else selectedRecordingIds.delete(item.id);
-    }
-    document.querySelectorAll("input.row-checkbox, input.card-checkbox").forEach((el) => { el.checked = checked; });
-    updateBulkBar();
-});
-
-historyBulkClearBtn.addEventListener("click", () => {
-    selectedRecordingIds.clear();
-    document.querySelectorAll("input.row-checkbox, input.card-checkbox").forEach((el) => { el.checked = false; });
-    updateBulkBar();
-});
-
-historyBulkDeleteBtn.addEventListener("click", () => {
-    const ids = [...selectedRecordingIds];
-    if (ids.length === 0) return;
-
-    confirmDialog(t("bulkDeleteConfirm", { n: ids.length }), { title: t("modalDeleteTitle"), danger: true, confirmLabel: t("modalDeleteConfirm") })
-        .then((ok) => {
-            if (!ok) return;
-
-            return Promise.allSettled(ids.map((id) => deleteRecording(id)))
-                .then((results) => {
-                    const failed = results.filter((r) => r.status === "rejected").length;
-                    const succeeded = results.length - failed;
-                    selectedRecordingIds.clear();
-                    if (failed === 0) {
-                        showToast(t("bulkDeleteSuccess", { n: succeeded }), "success");
-                    } else {
-                        showToast(t("bulkDeletePartial", { succeeded, failed }), "error");
-                    }
-                    loadHistory();
-                    loadStats();
-                });
-        });
-});
 
 function downloadRecordingAudio(id, originalFilename) {
     const link = document.createElement("a");
@@ -2050,33 +1934,6 @@ function loadStats() {
 }
 
 const PLAY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>';
-const TRASH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
-const EDIT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>';
-
-// Renames only ever touch the display name shown to the user
-// (originalFilename server-side) - never the stored audio file itself.
-function renameRecording(id, currentName) {
-    promptDialog(t("renamePrompt"), currentName || "").then((proposed) => {
-        if (proposed == null) return; // cancelled
-        const nextName = proposed.trim();
-        if (!nextName || nextName === currentName) return;
-
-        fetch(`/api/v1/recordings/${id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ originalFilename: nextName }),
-        })
-            .then((res) => res.json().then((data) => {
-                if (!res.ok) throw new Error(data.error || "Rename failed");
-                return data;
-            }))
-            .then(() => {
-                showToast(t("renameSuccess"), "success");
-                loadHistory();
-            })
-            .catch((err) => showToast(t("renameError", { msg: err.message }), "error"));
-    });
-}
 const FILE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
 const STATUS_ICONS = {
     completed: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
@@ -2130,9 +1987,7 @@ function formatRelativeTime(dateInput) {
 function renderHistory(data) {
     historyTableBody.innerHTML = "";
     historyCardList.innerHTML = "";
-    selectedRecordingIds.clear();
     currentPageItems = data.items || [];
-    updateBulkBar();
 
     if (!data.items || data.items.length === 0) {
         historyTable.classList.add("hidden");
@@ -2191,7 +2046,6 @@ function buildTableRow(item) {
     tr.setAttribute("role", "button");
     const name = item.originalFilename ? toMp3DisplayName(item.originalFilename) : t("untitled");
     tr.innerHTML = `
-        <td class="col-select"><input type="checkbox" class="row-checkbox" data-id="${item.id}" aria-label="${t("selectRecordingAria")}"></td>
         <td>
             <div class="rec-file-cell">
                 <span class="rec-file-icon" aria-hidden="true">${FILE_ICON}</span>
@@ -2209,21 +2063,15 @@ function buildTableRow(item) {
         <td>
             <div class="row-actions">
                 <button type="button" class="icon-btn row-play-btn" aria-label="${t("openAria")}">${PLAY_ICON}</button>
-                <button type="button" class="icon-btn row-rename-btn" aria-label="${t("renameAudioAria")}">${EDIT_ICON}</button>
                 <button type="button" class="icon-btn row-download-btn" aria-label="${t("downloadAudioAria")}">${DOWNLOAD_ICON}</button>
-                <button type="button" class="icon-btn row-delete-btn" aria-label="${t("deleteAria")}">${TRASH_ICON}</button>
             </div>
         </td>
     `;
     tr.querySelector(".rec-file-name").textContent = name;
     tr.addEventListener("click", () => openHistoryDetail(item.id));
     tr.addEventListener("keydown", (e) => { if (e.key === "Enter") openHistoryDetail(item.id); });
-    tr.querySelector(".row-checkbox").addEventListener("click", (e) => e.stopPropagation());
-    tr.querySelector(".row-checkbox").addEventListener("change", (e) => toggleRowSelection(item.id, e.target.checked));
     tr.querySelector(".row-play-btn").addEventListener("click", (e) => { e.stopPropagation(); openHistoryDetail(item.id); });
-    tr.querySelector(".row-rename-btn").addEventListener("click", (e) => { e.stopPropagation(); renameRecording(item.id, name); });
     tr.querySelector(".row-download-btn").addEventListener("click", (e) => { e.stopPropagation(); downloadRecordingAudio(item.id, item.originalFilename); });
-    tr.querySelector(".row-delete-btn").addEventListener("click", (e) => { e.stopPropagation(); quickDelete(item.id); });
     return tr;
 }
 
@@ -2233,7 +2081,6 @@ function buildCard(item) {
     const name = item.originalFilename ? toMp3DisplayName(item.originalFilename) : t("untitled");
     card.innerHTML = `
         <div class="history-item-top">
-            <input type="checkbox" class="card-checkbox" data-id="${item.id}" aria-label="${t("selectRecordingAria")}">
             <span class="rec-file-icon" aria-hidden="true">${FILE_ICON}</span>
             <div class="history-item-info">
                 <div class="history-item-name"></div>
@@ -2241,9 +2088,7 @@ function buildCard(item) {
             </div>
             <div class="row-actions">
                 <button type="button" class="icon-btn row-play-btn" aria-label="${t("openAria")}">${PLAY_ICON}</button>
-                <button type="button" class="icon-btn row-rename-btn" aria-label="${t("renameAudioAria")}">${EDIT_ICON}</button>
                 <button type="button" class="icon-btn row-download-btn" aria-label="${t("downloadAudioAria")}">${DOWNLOAD_ICON}</button>
-                <button type="button" class="icon-btn row-delete-btn" aria-label="${t("deleteAria")}">${TRASH_ICON}</button>
             </div>
         </div>
         <div class="history-item-badges">
@@ -2260,38 +2105,9 @@ function buildCard(item) {
     `;
     card.querySelector(".history-item-name").textContent = name;
     card.addEventListener("click", () => openHistoryDetail(item.id));
-    card.querySelector(".card-checkbox").addEventListener("click", (e) => e.stopPropagation());
-    card.querySelector(".card-checkbox").addEventListener("change", (e) => toggleRowSelection(item.id, e.target.checked));
     card.querySelector(".row-play-btn").addEventListener("click", (e) => { e.stopPropagation(); openHistoryDetail(item.id); });
-    card.querySelector(".row-rename-btn").addEventListener("click", (e) => { e.stopPropagation(); renameRecording(item.id, name); });
     card.querySelector(".row-download-btn").addEventListener("click", (e) => { e.stopPropagation(); downloadRecordingAudio(item.id, item.originalFilename); });
-    card.querySelector(".row-delete-btn").addEventListener("click", (e) => { e.stopPropagation(); quickDelete(item.id); });
     return card;
-}
-
-// Shared by every single-recording delete call site so a real server-side
-// error message (permission, not-found, etc.) always reaches the user
-// instead of a generic "Delete failed" string.
-function deleteRecording(id) {
-    return fetch(`/api/v1/recordings/${id}`, { method: "DELETE" }).then((res) => {
-        if (res.status === 204) return;
-        return res.json().then((data) => {
-            throw new Error(data.error || "Delete failed");
-        });
-    });
-}
-
-function quickDelete(id) {
-    confirmDialog(t("deleteConfirm"), { title: t("modalDeleteTitle"), danger: true, confirmLabel: t("modalDeleteConfirm") }).then((ok) => {
-        if (!ok) return;
-        deleteRecording(id)
-            .then(() => {
-                showToast(t("deletedToast"), "success");
-                loadHistory();
-                loadStats();
-            })
-            .catch((err) => showToast(t("deleteError", { msg: err.message }), "error"));
-    });
 }
 
 historyFiltersForm.addEventListener("submit", (e) => {
@@ -2311,38 +2127,10 @@ historyClearBtn.addEventListener("click", () => {
     loadStats();
 });
 
-// "Deleting" a recording only ever hides it server-side - it's never
-// actually removed. This brings back everything hidden within the
-// currently-selected date range (an empty from/to means "any time").
-historyRestoreBtn.addEventListener("click", () => {
-    const dateFrom = historyDateFrom.value || undefined;
-    const dateTo = historyDateTo.value || undefined;
-
-    fetch("/api/v1/recordings/restore", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dateFrom, dateTo }),
-    })
-        .then((res) => res.json().then((data) => {
-            if (!res.ok) throw new Error(data.error || "Restore failed");
-            return data;
-        }))
-        .then((data) => {
-            if (data.restored > 0) {
-                showToast(t("restoreSuccess", { n: data.restored }), "success");
-                loadHistory();
-                loadStats();
-            } else {
-                showToast(t("restoreNone"));
-            }
-        })
-        .catch((err) => showToast(t("restoreError", { msg: err.message }), "error"));
-});
 historyPrevBtn.addEventListener("click", () => { historyPage = Math.max(1, historyPage - 1); loadHistory(); });
 historyNextBtn.addEventListener("click", () => { historyPage += 1; loadHistory(); });
 
 let openRecordingId = null;
-let openRecordingName = "";
 let historyDetailPreviousFocus = null;
 
 function openHistoryDetail(id) {
@@ -2354,7 +2142,6 @@ function openHistoryDetail(id) {
         }))
         .then((rec) => {
             openRecordingId = rec.id;
-            openRecordingName = rec.originalFilename ? toMp3DisplayName(rec.originalFilename) : t("untitled");
             historyAudioPlayer.src = `/api/v1/recordings/${rec.id}/audio`;
             historyTranscriptionText.value = rec.transcriptionText || "";
             historyTranslationText.value = rec.translationText || "";
@@ -2371,7 +2158,6 @@ function closeHistoryDetail() {
     historyAudioPlayer.pause();
     historyAudioPlayer.src = "";
     openRecordingId = null;
-    openRecordingName = "";
     if (historyDetailPreviousFocus && typeof historyDetailPreviousFocus.focus === "function") {
         historyDetailPreviousFocus.focus();
     }
@@ -2408,11 +2194,6 @@ function handleHistoryDetailKeydown(event) {
     }
 }
 
-historyDetailRenameBtn.addEventListener("click", () => {
-    if (!openRecordingId) return;
-    renameRecording(openRecordingId, openRecordingName);
-});
-
 historyDetailClose.addEventListener("click", closeHistoryDetail);
 historyDetailOverlay.addEventListener("click", (e) => {
     if (e.target === historyDetailOverlay) closeHistoryDetail();
@@ -2420,22 +2201,6 @@ historyDetailOverlay.addEventListener("click", (e) => {
 
 wireDropdown("historyExportDropdown", "historyExportToggleBtn", "historyExportMenu", (format) => {
     if (openRecordingId) window.location.href = `/api/v1/recordings/${openRecordingId}/export?format=${format}`;
-});
-
-historyDeleteBtn.addEventListener("click", () => {
-    if (!openRecordingId) return;
-    confirmDialog(t("deleteConfirm"), { title: t("modalDeleteTitle"), danger: true, confirmLabel: t("modalDeleteConfirm") }).then((ok) => {
-        if (!ok) return;
-
-        deleteRecording(openRecordingId)
-            .then(() => {
-                showToast(t("deletedToast"), "success");
-                closeHistoryDetail();
-                loadHistory();
-                loadStats();
-            })
-            .catch((err) => showToast(t("deleteError", { msg: err.message }), "error"));
-    });
 });
 
 // Export the currently filtered history as a CSV (client-side; no server

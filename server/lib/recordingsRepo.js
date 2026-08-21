@@ -74,34 +74,6 @@ function remove(id) {
     return result.changes > 0;
 }
 
-// The user-facing "delete" - marks a recording hidden so it drops out of
-// list() (and thus the History tab) without touching the DB row or the
-// audio file on disk. Real removal only ever happens via pruneExpired().
-function hide(id) {
-    return update(id, { hidden: 1 });
-}
-
-// Un-hides every recording created within [dateFrom, dateTo] (inclusive,
-// either end optional) - lets a user bring back what their own "delete"
-// only ever hid, scoped to a period they choose, without needing any kind
-// of admin/recovery tooling.
-function restoreHiddenByDateRange({ dateFrom, dateTo } = {}) {
-    const clauses = ["hidden = 1"];
-    const params = {};
-    if (dateFrom) {
-        clauses.push("created_at >= @dateFrom");
-        params.dateFrom = dateFrom;
-    }
-    if (dateTo) {
-        clauses.push("created_at <= @dateTo");
-        params.dateTo = endOfDayIso(dateTo);
-    }
-    const where = `WHERE ${clauses.join(" AND ")}`;
-    const ts = nowIso();
-    const result = db.prepare(`UPDATE recordings SET hidden = 0, updated_at = @ts ${where}`).run({ ...params, ts });
-    return result.changes;
-}
-
 // List with search/filter/pagination. `q` matches filename or transcription/
 // translation text (simple substring search - fine at this scale; a
 // dedicated search index would be overkill for a self-hosted history log).
@@ -158,4 +130,4 @@ function pruneExpired(retentionDays) {
     return expired;
 }
 
-module.exports = { create, update, getById, getVisibleById, remove, hide, restoreHiddenByDateRange, list, pruneExpired };
+module.exports = { create, update, getById, getVisibleById, remove, list, pruneExpired };

@@ -218,7 +218,7 @@ describe("POST /api/v1/transcribe with an existing recordingId", () => {
     test("404s for a hidden (soft-deleted) recordingId instead of silently re-transcribing it", async () => {
         const storedFilename = "hidden-recording.mp3";
         const existing = seedPendingRecording(storedFilename);
-        recordingsRepo.hide(existing.id);
+        recordingsRepo.update(existing.id, { hidden: 1 });
         audioStorage.storedFilePath.mockImplementation((name) => path.join(tempAudioDir, name));
 
         const res = await request(app).post("/api/v1/transcribe").field("recordingId", existing.id);

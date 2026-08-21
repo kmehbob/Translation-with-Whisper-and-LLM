@@ -376,29 +376,13 @@
                     <span data-i18n="searchBtn">Search</span>
                 </button>
                 <button type="button" class="btn btn-ghost btn-sm" id="historyClearBtn" data-i18n="clearFiltersBtn">Clear filters</button>
-                <button type="button" class="btn btn-secondary btn-sm" id="historyRestoreBtn" title="Deleted recordings are only hidden, never removed from the server - bring back everything deleted within the selected date range">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                    <span data-i18n="restoreForPeriod">Restore deleted for this period</span>
-                </button>
             </div>
         </form>
-
-        <div id="historyBulkBar" class="history-bulk-bar hidden">
-            <span id="historyBulkCount">0 selected</span>
-            <div class="history-bulk-actions">
-                <button type="button" class="btn btn-ghost btn-sm" id="historyBulkClearBtn" data-i18n="bulkClearSelection">Clear selection</button>
-                <button type="button" class="btn btn-danger btn-sm" id="historyBulkDeleteBtn">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-                    <span data-i18n="bulkDeleteSelected">Delete selected</span>
-                </button>
-            </div>
-        </div>
 
         <div class="scroller history-table-wrap">
             <table id="historyTable" class="history-table hidden">
                 <thead>
                     <tr>
-                        <th class="col-select"><input type="checkbox" id="historySelectAllCheckbox" aria-label="Select all" data-i18n-aria-label="selectAllAria"></th>
                         <th data-i18n="colRecording">Recording</th>
                         <th data-i18n="colSource">Source</th>
                         <th data-i18n="colDuration">Duration</th>
@@ -437,9 +421,6 @@
                 <div class="card-title-row">
                     <h2 data-i18n="detailTitle">Recording detail</h2>
                     <div class="button-row">
-                        <button type="button" id="historyDetailRenameBtn" class="icon-btn" aria-label="Rename" data-i18n-aria-label="renameAudioAria">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
-                        </button>
                         <button type="button" id="historyDetailClose" class="icon-btn" aria-label="Close" data-i18n-aria-label="closeAria">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
@@ -469,10 +450,6 @@
                             <button type="button" id="historyExportPdfBtn" data-format="pdf" role="menuitem">PDF</button>
                         </div>
                     </div>
-                    <button type="button" class="btn btn-danger" id="historyDeleteBtn">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-                        <span data-i18n="deleteBtn">Delete</span>
-                    </button>
                 </div>
             </div>
         </div>

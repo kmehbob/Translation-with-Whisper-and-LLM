@@ -217,7 +217,7 @@ describe("POST /api/v1/translate", () => {
 
         test("404s for a hidden (soft-deleted) recordingId instead of silently translating it", async () => {
             const rec = seedRecording();
-            recordingsRepo.hide(rec.id);
+            recordingsRepo.update(rec.id, { hidden: 1 });
 
             const res = await request(app).post("/api/v1/translate").send({ text: "ہیلو", recordingId: rec.id });
 
